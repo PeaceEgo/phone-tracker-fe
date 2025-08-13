@@ -249,16 +249,16 @@ export function TrackingMap({ devices, height = "h-[600px]", showTrails = false,
   }, [map, devices, onDeviceClick, showTrails])
 
   if (error) {
-    return (
-      <FallbackMap
-        devices={devices}
-        height={height}
-        onRetry={() => {
-          setError(null)
-          window.location.reload()
-        }}
-      />
-    )
+    // return (
+    //   // <FallbackMap
+    //   //   devices={devices}
+    //   //   height={height}
+    //   //   onRetry={() => {
+    //   //     setError(null)
+    //   //     window.location.reload()
+    //   //   }}
+    //   // />
+    // )
   }
 
   return (

@@ -1,88 +1,82 @@
-import { LoginFormData, RegisterFormData } from './validation';
-
 export interface AuthResponse {
-  message: string;
+  message: string
+  accessToken: string
   user: {
-    id: string;
-    email: string;
-    fullname: string;
-  };
+    id: string
+    email: string
+    fullName: string
+  }
 }
 
-export async function registerUser(data: RegisterFormData): Promise<AuthResponse> {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
+async function fetchWithCreds(input: RequestInfo, init?: RequestInit) {
+  return fetch(input, {
+    ...init,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  })
+}
+
+export async function fetchWithAutoRefresh(input: RequestInfo, init?: RequestInit) {
+  let response = await fetchWithCreds(input, init)
+
+  if (response.status === 401) {
+    const refreshResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+
+    if (!refreshResponse.ok) {
+      throw new Error('Session expired. Please log in again.')
+    }
+
+    const { accessToken } = await refreshResponse.json()
+    const { setState } = require('@/store/auth').useAuthStore
+    setState({ accessToken })
+
+    // Retry original request with new token
+    response = await fetchWithCreds(input, {
+      ...init,
+      headers: {
+        ...(init?.headers || {}),
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+  }
+
+  return response
+}
+
+export async function loginUser(data: { email: string; password: string }): Promise<AuthResponse> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
     credentials: 'include',
-  });
+    headers: { 'Content-Type': 'application/json' },
+  })
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || 'Registration failed');
-  }
-
-  return response.json();
+  if (!res.ok) throw new Error((await res.json()).message || 'Login failed')
+  return res.json()
 }
 
-export async function loginUser(data:LoginFormData): Promise<AuthResponse> {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+export async function registerUser(data: { fullName: string; email: string; password: string }): Promise<AuthResponse> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
     credentials: 'include',
-  });
+    headers: { 'Content-Type': 'application/json' },
+  })
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || 'Login failed');
-  }
-
-  return response.json();
-}
-
-export async function refreshToken(): Promise<{ message: string }> {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
-    method: 'POST',
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || 'Token refresh failed');
-  }
-
-  return response.json();
+  if (!res.ok) throw new Error((await res.json()).message || 'Registration failed')
+  return res.json()
 }
 
 export async function logoutUser(): Promise<void> {
-  await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
     method: 'POST',
     credentials: 'include',
-  });
-}
-
-export async function fetchProtectedData(): Promise<any> {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/protected`, {
-    method: 'GET',
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      await refreshToken();
-      const retryResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/protected`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-      if (!retryResponse.ok) {
-        throw new Error('Failed to fetch protected data after token refresh');
-      }
-      return retryResponse.json();
-    }
-    const errorData = await response.json();
-    throw new Error(errorData.message || 'Failed to fetch protected data');
-  }
-
-  return response.json();
+  })
+  if (!res.ok) throw new Error((await res.json()).message || 'Logout failed')
 }

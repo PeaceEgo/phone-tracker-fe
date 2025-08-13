@@ -1,17 +1,35 @@
-"use client"
-import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { DashboardOverview } from "@/components/dashboard-overview"
-import { DeviceRegistration } from "@/components/device-registration"
-import { LocationHistory } from "@/components/location-history"
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import { RealTimeTracking } from "@/components/realtime-tracking"
-import { NotificationSettings } from "@/components/notification-settings"
-import { SettingsPanel } from "@/components/setting-pannel"
-import { DashboardSidebar } from "@/components/sidebar"
+"use client";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { DashboardOverview } from "@/components/dashboard-overview";
+import { LocationHistory } from "@/components/location-history";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { RealTimeTracking } from "@/components/realtime-tracking";
+import { NotificationSettings } from "@/components/notification-settings";
+import { SettingsPanel } from "@/components/setting-pannel";
+import { DashboardSidebar } from "@/components/sidebar";
+import { DeviceRegistration } from "@/components/device-registration";
+
+interface Position {
+  left: string;
+  top: string;
+  duration: number;
+  delay: number;
+}
 
 export default function Dashboard() {
-  const [activeSection, setActiveSection] = useState("overview")
+  const [activeSection, setActiveSection] = useState("overview");
+  const [positions, setPositions] = useState<Position[]>([]);
+
+  useEffect(() => {
+    const newPositions = Array.from({ length: 15 }, () => ({
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      duration: 4 + Math.random() * 2,
+      delay: Math.random() * 2,
+    }));
+    setPositions(newPositions);
+  }, []);
 
   const sectionTitles = {
     overview: "Dashboard Overview",
@@ -20,7 +38,7 @@ export default function Dashboard() {
     tracking: "Real-time Tracking",
     notifications: "Notification Settings",
     settings: "Settings Panel",
-  }
+  };
 
   const renderContent = () => {
     const components = {
@@ -30,10 +48,10 @@ export default function Dashboard() {
       tracking: <RealTimeTracking />,
       notifications: <NotificationSettings />,
       settings: <SettingsPanel />,
-    }
+    };
 
-    return components[activeSection as keyof typeof components] || <DashboardOverview />
-  }
+    return components[activeSection as keyof typeof components] || <DashboardOverview />;
+  };
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
@@ -42,22 +60,22 @@ export default function Dashboard() {
 
       {/* Floating Elements */}
       <div className="fixed inset-0 pointer-events-none -z-10">
-        {[...Array(15)].map((_, i) => (
+        {positions.map((pos, i) => (
           <motion.div
             key={i}
             className="absolute w-1 h-1 bg-blue-400/20 rounded-full"
             style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
+              left: pos.left,
+              top: pos.top,
             }}
             animate={{
               y: [0, -20, 0],
               opacity: [0.2, 0.8, 0.2],
             }}
             transition={{
-              duration: 4 + Math.random() * 2,
+              duration: pos.duration,
               repeat: Number.POSITIVE_INFINITY,
-              delay: Math.random() * 2,
+              delay: pos.delay,
             }}
           />
         ))}
@@ -134,5 +152,5 @@ export default function Dashboard() {
         </SidebarInset>
       </SidebarProvider>
     </div>
-  )
+  );
 }

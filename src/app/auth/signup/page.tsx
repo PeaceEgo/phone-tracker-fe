@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { motion } from "framer-motion"
 import { registerSchema, type RegisterFormData } from "@/lib/validation"
-import { registerUser } from "@/lib/api"
+import { useAuthStore } from "@/store/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Smartphone, ArrowRight, User, Mail, Lock, Loader2 } from "lucide-react"
@@ -12,24 +12,23 @@ import Link from "next/link"
 
 const SignUp = () => {
   const router = useRouter()
+  const { register: registerUser, isLoading, error, clearError } = useAuthStore()
+  
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   })
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
+      clearError()
       await registerUser(data)
       router.push("/auth/login")
     } catch (error) {
-      if (error instanceof Error) {
-        alert(error.message)
-      } else {
-        alert("Something went wrong")
-      }
+      // Error is already handled in the store
     }
   }
 
@@ -62,19 +61,24 @@ const SignUp = () => {
       </div>
 
       <div className="relative z-10 w-full max-w-md p-6">
+        {/* Logo and title */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           className="text-center mb-8"
         >
-          <motion.div className="flex items-center justify-center space-x-2 mb-6" whileHover={{ scale: 1.05 }}>
+          <motion.div 
+            className="flex items-center justify-center space-x-2 mb-6" 
+            whileHover={{ scale: 1.05 }}
+          >
             <Smartphone className="w-8 h-8 text-blue-400" />
             <span className="text-2xl font-bold bg-gradient-to-r from-white to-blue-400 bg-clip-text text-transparent">
               TrackGuard
             </span>
           </motion.div>
 
+          {/* Progress bar */}
           <div className="flex justify-center mb-4">
             <div className="w-2/3 bg-white/10 h-1.5 rounded-full overflow-hidden">
               <motion.div
@@ -87,6 +91,7 @@ const SignUp = () => {
           </div>
         </motion.div>
 
+        {/* Sign up card */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -94,6 +99,7 @@ const SignUp = () => {
         >
           <Card className="bg-white/5 border-white/10 backdrop-blur-md shadow-2xl">
             <CardContent className="p-8">
+              {/* Header */}
               <div className="text-center mb-6">
                 <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-white to-blue-400 bg-clip-text text-transparent">
                   Create Account
@@ -103,7 +109,14 @@ const SignUp = () => {
                 </p>
               </div>
 
+              {/* Error message */}
+              {error && (
+                <div className="text-red-400 text-center mb-4">{error}</div>
+              )}
+
+              {/* Sign up form */}
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                {/* Full name field */}
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -131,6 +144,7 @@ const SignUp = () => {
                   )}
                 </motion.div>
 
+                {/* Email field */}
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -158,6 +172,7 @@ const SignUp = () => {
                   )}
                 </motion.div>
 
+                {/* Password field */}
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -185,6 +200,7 @@ const SignUp = () => {
                   )}
                 </motion.div>
 
+                {/* Submit button */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -192,10 +208,10 @@ const SignUp = () => {
                 >
                   <Button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isLoading}
                     className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 text-lg font-semibold group disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isSubmitting ? (
+                    {isLoading ? (
                       <>
                         <Loader2 className="mr-2 w-5 h-5 animate-spin" />
                         Creating Account...
@@ -210,6 +226,7 @@ const SignUp = () => {
                 </motion.div>
               </form>
 
+              {/* Login link */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

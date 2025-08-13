@@ -1,15 +1,37 @@
-"use client"
-import { motion, useScroll, useTransform } from "framer-motion"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Shield, Smartphone, MapPin, Clock, Users, Star, ArrowRight, Play, Check } from "lucide-react"
-import Header from "@/components/header"
+"use client";
+import { useState, useEffect } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Shield, Smartphone, MapPin, Clock, Users, Star, ArrowRight, Play, Check } from "lucide-react";
+import Header from "@/components/header";
+
+interface Position {
+  left: string;
+  top: string;
+  duration: number;
+  delay: number;
+}
 
 export default function LandingPage() {
-  const { scrollYProgress } = useScroll()
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "50%"])
-  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0])
+  const { scrollYProgress } = useScroll();
+  const y = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
+  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    // Set client flag and generate positions
+    setIsClient(true);
+    const newPositions = Array.from({ length: 20 }, () => ({
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      duration: 3 + Math.random() * 2,
+      delay: Math.random() * 2,
+    }));
+    setPositions(newPositions);
+  }, []);
 
   const features = [
     {
@@ -32,7 +54,7 @@ export default function LandingPage() {
       title: "Family Safety",
       description: "Keep your family safe with comprehensive monitoring tools",
     },
-  ]
+  ];
 
   const testimonials = [
     {
@@ -53,7 +75,7 @@ export default function LandingPage() {
       content: "Easy to use interface with powerful monitoring capabilities.",
       rating: 5,
     },
-  ]
+  ];
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
@@ -69,27 +91,29 @@ export default function LandingPage() {
         />
 
         {/* Floating Elements */}
-        <div className="absolute inset-0">
-          {[...Array(20)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-2 h-2 bg-blue-400/30 rounded-full"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
-              animate={{
-                y: [0, -30, 0],
-                opacity: [0.3, 1, 0.3],
-              }}
-              transition={{
-                duration: 3 + Math.random() * 2,
-                repeat: Number.POSITIVE_INFINITY,
-                delay: Math.random() * 2,
-              }}
-            />
-          ))}
-        </div>
+        {isClient && (
+          <div className="absolute inset-0">
+            {positions.map((pos, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-2 h-2 bg-blue-400/30 rounded-full"
+                style={{
+                  left: pos.left,
+                  top: pos.top,
+                }}
+                animate={{
+                  y: [0, -30, 0],
+                  opacity: [0.3, 1, 0.3],
+                }}
+                transition={{
+                  duration: pos.duration,
+                  repeat: Number.POSITIVE_INFINITY,
+                  delay: pos.delay,
+                }}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
@@ -304,5 +328,5 @@ export default function LandingPage() {
         </div>
       </footer>
     </div>
-  )
+  );
 }

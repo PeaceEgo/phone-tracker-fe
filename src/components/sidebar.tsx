@@ -1,5 +1,5 @@
 "use client"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Sidebar,
   SidebarContent,
@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/sidebar"
 import { LayoutDashboard, Smartphone, MapPin, Radio, Bell, Settings, User, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
+import { useAuthStore } from "@/store/auth"
 
 interface DashboardSidebarProps {
   activeSection: string
@@ -23,37 +25,22 @@ interface DashboardSidebarProps {
 
 export function DashboardSidebar({ activeSection, setActiveSection }: DashboardSidebarProps) {
   const menuItems = [
-    {
-      id: "overview",
-      title: "Overview",
-      icon: LayoutDashboard,
-    },
-    {
-      id: "registration",
-      title: "Device Registration",
-      icon: Smartphone,
-    },
-    {
-      id: "tracking",
-      title: "Real-time Tracking",
-      icon: Radio,
-    },
-    {
-      id: "history",
-      title: "Location History",
-      icon: MapPin,
-    },
-    {
-      id: "notifications",
-      title: "Notifications",
-      icon: Bell,
-    },
-    {
-      id: "settings",
-      title: "Settings",
-      icon: Settings,
-    },
+    { id: "overview", title: "Overview", icon: LayoutDashboard },
+    { id: "registration", title: "Device Registration", icon: Smartphone },
+    { id: "tracking", title: "Real-time Tracking", icon: Radio },
+    { id: "history", title: "Location History", icon: MapPin },
+    { id: "notifications", title: "Notifications", icon: Bell },
+    { id: "settings", title: "Settings", icon: Settings },
   ]
+
+  const { user, logout } = useAuthStore()
+  const router = useRouter()
+
+  const handleLogout = () => {
+    localStorage.removeItem("auth-storage") 
+    logout()
+    router.push("/auth/login")
+  }
 
   return (
     <Sidebar className="border-r border-white/10">
@@ -104,7 +91,9 @@ export function DashboardSidebar({ activeSection, setActiveSection }: DashboardS
                     >
                       <item.icon
                         className={`w-5 h-5 mr-3 transition-colors ${
-                          activeSection === item.id ? "text-blue-400" : "text-gray-400 group-hover:text-blue-400"
+                          activeSection === item.id
+                            ? "text-blue-400"
+                            : "text-gray-400 group-hover:text-blue-400"
                         }`}
                       />
                       <span className="font-medium">{item.title}</span>
@@ -136,13 +125,27 @@ export function DashboardSidebar({ activeSection, setActiveSection }: DashboardS
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
               <User className="w-4 h-4 text-white" />
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-white">John Doe</p>
-              <p className="text-xs text-gray-400">Premium Plan</p>
+            <div className="flex-1 overflow-hidden">
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={user?.id || "guest"}
+                  className="text-sm font-medium text-white truncate"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {user?.name || "Guest"}
+                </motion.p>
+              </AnimatePresence>
+              {/* <p className="text-xs text-gray-400">
+                {user ? "Premium Plan" : "Not signed in"}
+              </p> */}
             </div>
           </div>
 
           <Button
+            onClick={handleLogout}
             variant="ghost"
             size="sm"
             className="w-full justify-start text-gray-400 hover:text-white hover:bg-white/5"

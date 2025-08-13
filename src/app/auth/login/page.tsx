@@ -6,38 +6,38 @@ import { Smartphone, ArrowRight, Mail, Lock } from "lucide-react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
-import { LoginFormData, loginSchema } from "@/lib/validation";
-import { loginUser } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/auth";
+import { LoginFormData, loginSchema } from "@/lib/validation";
 
 const Login = () => {
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { login, isLoading, error, clearError } = useAuthStore();
+  
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
 
   const onSubmit = async (data: LoginFormData) => {
     try {
-      setError(null);
-      const response = await loginUser(data);
-      console.log("Login successful:", response);
-      router.push("/dashboard"); 
-    } catch (err: any) {
-      setError(err.message || "Login failed. Please try again.");
+      clearError();
+      await login(data.email, data.password);
+      router.push("/dashboard");
+    } catch (error) {
+      // Error is already handled in the store
     }
   };
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden relative flex items-center justify-center">
-      
+      {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-purple-900/20 to-black" />
 
+      {/* Floating animation elements */}
       <div className="absolute inset-0">
         {[...Array(15)].map((_, i) => (
           <motion.div
@@ -60,14 +60,19 @@ const Login = () => {
         ))}
       </div>
 
+      {/* Main content container */}
       <div className="relative z-10 w-full max-w-md p-6">
+        {/* Logo and title */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           className="text-center mb-8"
         >
-          <motion.div className="flex items-center justify-center space-x-2 mb-6" whileHover={{ scale: 1.05 }}>
+          <motion.div 
+            className="flex items-center justify-center space-x-2 mb-6" 
+            whileHover={{ scale: 1.05 }}
+          >
             <Smartphone className="w-8 h-8 text-blue-400" />
             <span className="text-2xl font-bold bg-gradient-to-r from-white to-blue-400 bg-clip-text text-transparent">
               TrackGuard
@@ -75,6 +80,7 @@ const Login = () => {
           </motion.div>
         </motion.div>
 
+        {/* Login card */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -82,6 +88,7 @@ const Login = () => {
         >
           <Card className="bg-white/5 border-white/10 backdrop-blur-md shadow-2xl">
             <CardContent className="p-8">
+              {/* Header */}
               <div className="text-center mb-6">
                 <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-white to-blue-400 bg-clip-text text-transparent">
                   Welcome Back
@@ -89,11 +96,14 @@ const Login = () => {
                 <p className="text-gray-400">Enter your credentials to access your account.</p>
               </div>
 
+              {/* Error message */}
               {error && (
                 <div className="text-red-400 text-center mb-4">{error}</div>
               )}
 
+              {/* Login form */}
               <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+                {/* Email field */}
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -115,6 +125,7 @@ const Login = () => {
                   </div>
                 </motion.div>
 
+                {/* Password field */}
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -136,6 +147,7 @@ const Login = () => {
                   </div>
                 </motion.div>
 
+                {/* Submit button */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -143,15 +155,16 @@ const Login = () => {
                 >
                   <Button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isLoading}
                     className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 text-lg font-semibold group"
                   >
-                    {isSubmitting ? "Logging in..." : "Login"}
+                    {isLoading ? "Logging in..." : "Login"}
                     <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </motion.div>
               </form>
 
+              {/* Footer links */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
