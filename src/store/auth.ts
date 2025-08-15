@@ -3,6 +3,20 @@ import { persist, StateStorage } from 'zustand/middleware'
 import { loginUser, registerUser, logoutUser } from '@/lib/api'
 import { useDevicesStore } from './devices'
 
+// Helper: SSR-safe localStorage
+const storage: StateStorage = {
+  getItem: (name:string) => {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem(name)
+  },
+  setItem: (name: string, value: string) => {
+    if (typeof window !== 'undefined') localStorage.setItem(name, value)
+  },
+  removeItem: (name:string) => {
+    if (typeof window !== 'undefined') localStorage.removeItem(name)
+  }
+}
+
 interface User {
   id: string
   name: string
@@ -115,8 +129,6 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false
           })
         }
-        set({ user: null, accessToken: null, refreshToken: null })
-
         useDevicesStore.getState().clearDevices()
       },
 
@@ -124,7 +136,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      storage: localStorage as unknown as StateStorage,
+      storage, // ✅ SSR-safe storage
       partialize: (state: AuthState) => ({
         user: state.user,
         accessToken: state.accessToken,
@@ -133,36 +145,3 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
-
-// Interfaces for devices
-export interface Device {
-  deviceId: string
-  name: string
-  type: 'android' | 'ios'
-  location: {
-    type: string
-    coordinates: [number, number]
-  }
-  locationName: string
-  qrCodeId: string
-  qrCodeImage?: string
-  registrationMethod: 'direct' | 'qr'
-  isActive: boolean
-  registeredAt: string
-}
-
-export interface QRCodeData {
-  qrCodeId: string
-  qrCodeImage: string
-  linkingUrl: string
-  expiresAt: string
-  deviceName: string
-  deviceType: 'android' | 'ios'
-}
-
-export interface ApiResponse<T> {
-  message: string
-  device?: T
-  devices?: T[]
-  qrCode?: QRCodeData
-}
