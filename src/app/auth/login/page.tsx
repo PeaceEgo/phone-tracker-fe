@@ -9,10 +9,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { LoginFormData, loginSchema } from "@/lib/validation";
+import { useEffect } from "react";
 
 const Login = () => {
   const router = useRouter();
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { login, isLoading, error, clearError, needsVerification, verificationEmail } = useAuthStore();
   
   const {
     register,
@@ -22,13 +23,20 @@ const Login = () => {
     resolver: zodResolver(loginSchema),
   });
 
+  // Redirect if user needs verification
+  useEffect(() => {
+    if (needsVerification && verificationEmail) {
+      router.push(`/auth/verify-email?email=${encodeURIComponent(verificationEmail)}`);
+    }
+  }, [needsVerification, verificationEmail, router]);
+
   const onSubmit = async (data: LoginFormData) => {
     try {
       clearError();
       await login(data.email, data.password);
       router.push("/dashboard");
     } catch (error) {
-      // Error is already handled in the store
+      
     }
   };
 

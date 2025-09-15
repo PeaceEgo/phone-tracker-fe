@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { useAuthStore } from "./auth";
-
+import { fetchWithAutoRefresh } from "@/lib/api";
 
 export interface Device {
   deviceId: string;
@@ -16,6 +16,8 @@ export interface Device {
   registrationMethod: "direct" | "qr";
   isActive: boolean;
   registeredAt?: string;
+  isOnline: boolean;
+  updatedAt?: string;
 }
 
 interface DevicesState {
@@ -28,79 +30,51 @@ interface DevicesState {
   removeDevice: (deviceId: string) => Promise<void>;
   getDeviceById: (deviceId: string) => Device | undefined;
   clearDevices: () => void;
+  fetchLocationHistory: (deviceId: string) => Promise<any>;
+  updateOnlineStatusFromHistory: (deviceId: string, latestTimestamp: string) => void;
 }
 
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 5 * 60 * 1000; 
 
 export const useDevicesStore = create<DevicesState>((set, get) => ({
   devices: [],
   isLoading: false,
   error: null,
 
-  fetchDevices: async (forceRefresh = false) => {
-    set({ error: null });
+  // In your devices store
+fetchDevices: async (forceRefresh = false) => {
+  set({ error: null });
 
-    const userId = useAuthStore.getState().user?.id;
-    if (!userId) return;
+  const userId = useAuthStore.getState().user?.id;
+  if (!userId) return;
 
-    const cacheKey = `user_devices_cache_${userId}`;
-    const etagKey = `user_devices_etag_${userId}`;
+  set({ isLoading: true });
 
-    // Load from cache instantly (first call)
-    const cachedRaw = localStorage.getItem(cacheKey);
-    if (cachedRaw && get().devices.length === 0) {
-      try {
-        const { devices, timestamp } = JSON.parse(cachedRaw);
-        if (Array.isArray(devices)) {
-          set({ devices, isLoading: false });
-        }
-        if (!forceRefresh && Date.now() - timestamp < CACHE_TTL) {
-          return; // Cache is still fresh, skip fetch
-        }
-      } catch {
-        /* Ignore broken cache */
+  try {
+    const response = await fetchWithAutoRefresh(
+      `${process.env.NEXT_PUBLIC_API_URL}/devices/user-devices`,
+      {
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
       }
-    }
+    );
 
-    set({ isLoading: true });
+    if (!response.ok) throw new Error("Failed to fetch devices");
 
-    const etag = localStorage.getItem(etagKey) || "";
+    const data = await response.json();
+    const devices = data.devices || [];
+    set({ devices, isLoading: false });
 
-    try {
-      const response = await fetch(
-        "https://phone-tracker-be.onrender.com/api/devices/user-devices",
-        {
-          credentials: "include",
-          headers: etag ? { "If-None-Match": etag } : {},
-        }
-      );
-
-      if (response.status === 304) {
-        set({ isLoading: false });
-        return;
-      }
-
-      if (!response.ok) throw new Error("Failed to fetch devices");
-
-      const data = await response.json();
-      const devices = data.devices || [];
-      set({ devices, isLoading: false });
-
-      // Save new cache + ETag
-      localStorage.setItem(
-        cacheKey,
-        JSON.stringify({ devices, timestamp: Date.now() })
-      );
-      if (response.headers.has("ETag")) {
-        localStorage.setItem(etagKey, response.headers.get("ETag") as string);
-      }
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : "Failed to fetch devices",
-        isLoading: false,
-      });
-    }
-  },
+    // Cache logic here...
+  } catch (error) {
+    set({
+      error: error instanceof Error ? error.message : "Failed to fetch devices",
+      isLoading: false,
+    });
+  }
+},
 
   addDevice: (device) => {
     const updated = [...get().devices, device];
@@ -171,4 +145,67 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
 
   getDeviceById: (deviceId) =>
     get().devices.find((device) => device.deviceId === deviceId),
+
+  fetchLocationHistory: async (deviceId: string) => {
+    try {
+      const res = await fetch(
+        `https://phone-tracker-be.onrender.com/locations/history/${deviceId}`,
+        { credentials: "include" }
+      );
+      
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error("Not authorized to view this device's location history");
+        }
+        if (res.status === 404) {
+          throw new Error("Device not found");
+        }
+        throw new Error(`Failed to fetch history: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.error("Error fetching location history:", err);
+      throw err; 
+    }
+  },
+
+  updateOnlineStatusFromHistory: (deviceId: string, latestTimestamp: string) => {
+    const now = new Date();
+    const lastUpdate = new Date(latestTimestamp);
+    const minutesSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
+    get().updateDevice(deviceId, { isOnline: minutesSinceUpdate < 15 });
+  },
+
+  fetchDistanceCovered: async (deviceId: string, hours?: number) => {
+  const res = await fetch(
+    `https://phone-tracker-be.onrender.com/api/locations/distance/${deviceId}?hours=${hours || 24}`,
+    { credentials: "include" }
+  );
+  if (!res.ok) throw new Error("Failed to fetch distance");
+  return await res.json();
+},
+
+// Add these methods to your store if needed:
+
+// Get location trail (movement path)
+fetchLocationTrail: async (deviceId: string, hours?: number) => {
+  const res = await fetch(
+    `https://phone-tracker-be.onrender.com/api/locations/trail/${deviceId}?hours=${hours || 24}`,
+    { credentials: "include" }
+  );
+  if (!res.ok) throw new Error("Failed to fetch trail");
+  return await res.json();
+},
+
+// Get location stats
+fetchLocationStats: async (deviceId: string, days?: number) => {
+  const res = await fetch(
+    `https://phone-tracker-be.onrender.com/api/locations/stats/${deviceId}?days=${days || 7}`,
+    { credentials: "include" }
+  );
+  if (!res.ok) throw new Error("Failed to fetch stats");
+  return await res.json();
+}
 }));

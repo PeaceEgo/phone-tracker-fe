@@ -13,21 +13,8 @@ export function DeviceRegistration() {
   const { devices, isLoading, fetchDevices, removeDevice } = useDevicesStore();
 
   useEffect(() => {
-    // // 1. Load cached devices instantly if available
-    // const cached = localStorage.getItem("user_devices_cache");
-    // if (cached) {
-    //   try {
-    //     const { devices: cachedDevices } = JSON.parse(cached);
-    //     if (Array.isArray(cachedDevices) && cachedDevices.length > 0) {
-    //       useDevicesStore.setState({ devices: cachedDevices, isLoading: false });
-    //     }
-    //   } catch {
-    //     // Ignore cache parse errors
-    //   }
-    // }
-
-    // 2. Fetch from API if TTL expired or cache missing
-    fetchDevices(false); // false = respect TTL
+  
+    fetchDevices(false);
   }, [fetchDevices]);
 
   const formatDate = (dateString: string) => {

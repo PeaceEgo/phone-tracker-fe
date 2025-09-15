@@ -29,8 +29,7 @@ export function DashboardSidebar({ activeSection, setActiveSection }: DashboardS
     { id: "registration", title: "Device Registration", icon: Smartphone },
     { id: "tracking", title: "Real-time Tracking", icon: Radio },
     { id: "history", title: "Location History", icon: MapPin },
-    { id: "notifications", title: "Notifications", icon: Bell },
-    { id: "settings", title: "Settings", icon: Settings },
+   
   ]
 
   const { user, logout } = useAuthStore()
