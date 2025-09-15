@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { motion } from "framer-motion"
+import { useEffect } from "react"
 import { registerSchema, type RegisterFormData } from "@/lib/validation"
 import { useAuthStore } from "@/store/auth"
 import { Button } from "@/components/ui/button"
@@ -12,7 +13,15 @@ import Link from "next/link"
 
 const SignUp = () => {
   const router = useRouter()
-  const { register: registerUser, isLoading, error, clearError } = useAuthStore()
+  const { 
+    register: registerUser, 
+    isLoading, 
+    error, 
+    clearError, 
+    needsVerification, 
+    verificationEmail,
+    setNeedsVerification // Add this
+  } = useAuthStore()
   
   const {
     register,
@@ -22,14 +31,34 @@ const SignUp = () => {
     resolver: zodResolver(registerSchema),
   })
 
+  // Reset verification state when component mounts
+  useEffect(() => {
+    if (needsVerification) {
+      setNeedsVerification(false)
+    }
+  }, []) // Empty dependency array = run only on mount
+
+  // Move the redirect logic to useEffect - only redirect AFTER successful registration
+  useEffect(() => {
+    if (needsVerification && verificationEmail) {
+      router.push(`/auth/verify-email?email=${encodeURIComponent(verificationEmail)}`)
+    }
+  }, [needsVerification, verificationEmail, router])
+
   const onSubmit = async (data: RegisterFormData) => {
     try {
       clearError()
       await registerUser(data)
-      router.push("/auth/login")
+      // The auth store will set needsVerification and verificationEmail
+      // The useEffect above will handle the redirect automatically
     } catch (error) {
       // Error is already handled in the store
     }
+  }
+
+  // Don't render if redirecting (only after successful registration)
+  if (needsVerification && verificationEmail) {
+    return null
   }
 
   return (
@@ -105,7 +134,7 @@ const SignUp = () => {
                   Create Account
                 </h2>
                 <p className="text-gray-400">
-                  Once you're set up, just log in from any device and see what they're up to.
+                  Once you're set up, just verify your email and log in from any device.
                 </p>
               </div>
 

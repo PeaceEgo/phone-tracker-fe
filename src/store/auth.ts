@@ -1,6 +1,12 @@
 import { create, StoreApi } from 'zustand'
-import { persist, StateStorage } from 'zustand/middleware'
-import { loginUser, registerUser, logoutUser } from '@/lib/api'
+import { persist } from 'zustand/middleware'
+import { 
+  loginUser, 
+  registerUser, 
+  logoutUser, 
+  verifyEmail as verifyEmailAPI,  // Rename to avoid conflict
+  resendVerificationEmail 
+} from '@/lib/api'
 import { useDevicesStore } from './devices'
 
 interface User {
@@ -15,86 +21,114 @@ interface RegisterParams {
   password: string
 }
 
-interface AuthResponse {
-  accessToken: string
-  user: {
-    id: string
-    email: string
-    fullName: string
-  }
-}
-
 interface AuthState {
-  accessToken: string | null
-  refreshToken?: string | null
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
+  isInitialized: boolean
   error: string | null
+  needsVerification: boolean
+  verificationEmail: string | null
+  verificationSuccess: boolean
+  verificationSentAt?: string
+
   login: (email: string, password: string) => Promise<void>
-  register: (formData: RegisterParams) => Promise<void>
-  setTokens: (accessToken: string, refreshToken?: string | null) => void
+  register: (formData: RegisterParams) => Promise<any>
   setUser: (user: User | null) => void
   logout: () => Promise<void>
   clearError: () => void
+  initializeAuth: () => void
+  verifyEmail: (otp: string) => Promise<any>
+  resendVerification: (email: string) => Promise<any>
+  setNeedsVerification: (needsVerification: boolean, email?: string) => void
+  clearVerificationSuccess: () => void
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set: StoreApi<AuthState>['setState'], get: StoreApi<AuthState>['getState']): AuthState => ({
-      accessToken: null,
-      refreshToken: null,
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      isInitialized: false,
       error: null,
+      needsVerification: false,
+      verificationEmail: null,
+      verificationSuccess: false,
 
-      setTokens: (accessToken: string, refreshToken: string | null = null) =>
+      setUser: (user: User | null) =>
         set(() => ({
-          accessToken,
-          refreshToken,
-          isAuthenticated: true
+          user,
+          isAuthenticated: !!user
         })),
 
-      setUser: (user: User | null) => set(() => ({ user })),
+      setNeedsVerification: (needsVerification: boolean, email?: string) =>
+        set({
+          needsVerification,
+          verificationEmail: email || null
+        }),
+
+      initializeAuth: () => {
+        const state = get()
+        if (state.isInitialized) return
+
+        console.log('🚀 Initializing auth state from storage...')
+
+        set({
+          isInitialized: true
+        })
+      },
 
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null })
         try {
-          const res: AuthResponse = await loginUser({ email, password })
+          const res = await loginUser({ email, password })
           set({
             user: {
               id: res.user.id,
               name: res.user.fullName,
               email: res.user.email
             },
-            accessToken: res.accessToken,
             isAuthenticated: true,
-            isLoading: false
+            isLoading: false,
+            isInitialized: true,
+            needsVerification: false,
+            verificationSuccess: false 
           })
+          console.log(res);
+
         } catch (err) {
-          set({
-            error: err instanceof Error ? err.message : 'Login failed',
-            isLoading: false
-          })
+          const errorMessage = err instanceof Error ? err.message : 'Login failed'
+
+          if (errorMessage.includes('verify your email') || errorMessage.includes('not verified')) {
+            set({
+              needsVerification: true,
+              verificationEmail: email,
+              error: errorMessage,
+              isLoading: false
+            })
+          } else {
+            set({
+              error: errorMessage,
+              isLoading: false
+            })
+          }
           throw err
         }
       },
 
       register: async (formData: RegisterParams) => {
-        set({ isLoading: true, error: null })
+        set({ isLoading: true, error: null, verificationSuccess: false })
         try {
-          const res: AuthResponse = await registerUser(formData)
+          const res = await registerUser(formData)
           set({
-            user: {
-              id: res.user.id,
-              name: res.user.fullName,
-              email: res.user.email
-            },
-            accessToken: res.accessToken,
-            isAuthenticated: true,
-            isLoading: false
+            needsVerification: true,
+            verificationEmail: formData.email,
+            isLoading: false,
+            isInitialized: true,
+            verificationSuccess: false
           })
+          return res
         } catch (err) {
           set({
             error: err instanceof Error ? err.message : 'Registration failed',
@@ -104,65 +138,72 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      verifyEmail: async (otp: string) => {
+        set({ isLoading: true, error: null })
+        try {
+          // Use the imported API function with renamed import
+          const result = await verifyEmailAPI(otp)
+          set({
+            needsVerification: false,
+            verificationEmail: null,
+            isLoading: false,
+            verificationSuccess: true
+          })
+          return result
+        } catch (err) {
+          set({
+            error: err instanceof Error ? err.message : 'Verification failed',
+            isLoading: false,
+            verificationSuccess: false
+          })
+          throw err
+        }
+      },
+
+      resendVerification: async (email: string) => {
+        set({ isLoading: true, error: null })
+        try {
+          const result = await resendVerificationEmail(email)
+          set({ isLoading: false })
+          return result
+        } catch (err) {
+          set({
+            error: err instanceof Error ? err.message : 'Failed to resend verification',
+            isLoading: false
+          })
+          throw err
+        }
+      },
+
       logout: async () => {
         try {
           await logoutUser()
+        } catch (error) {
+          console.error('Logout error:', error)
         } finally {
           set({
             user: null,
-            accessToken: null,
-            refreshToken: null,
-            isAuthenticated: false
+            isAuthenticated: false,
+            needsVerification: false,
+            verificationEmail: null,
+            verificationSuccess: false
           })
         }
-        set({ user: null, accessToken: null, refreshToken: null })
-
         useDevicesStore.getState().clearDevices()
       },
 
-      clearError: () => set({ error: null })
+      clearError: () => set({ error: null }),
+
+      clearVerificationSuccess: () => set({ verificationSuccess: false })
     }),
     {
       name: 'auth-storage',
-      storage: localStorage as unknown as StateStorage,
       partialize: (state: AuthState) => ({
         user: state.user,
-        accessToken: state.accessToken,
-        isAuthenticated: state.isAuthenticated
+        isAuthenticated: state.isAuthenticated,
+        isInitialized: state.isInitialized,
+        verificationEmail: state.verificationEmail
       })
     }
   )
 )
-
-// Interfaces for devices
-export interface Device {
-  deviceId: string
-  name: string
-  type: 'android' | 'ios'
-  location: {
-    type: string
-    coordinates: [number, number]
-  }
-  locationName: string
-  qrCodeId: string
-  qrCodeImage?: string
-  registrationMethod: 'direct' | 'qr'
-  isActive: boolean
-  registeredAt: string
-}
-
-export interface QRCodeData {
-  qrCodeId: string
-  qrCodeImage: string
-  linkingUrl: string
-  expiresAt: string
-  deviceName: string
-  deviceType: 'android' | 'ios'
-}
-
-export interface ApiResponse<T> {
-  message: string
-  device?: T
-  devices?: T[]
-  qrCode?: QRCodeData
-}

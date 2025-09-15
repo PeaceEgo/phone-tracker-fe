@@ -7,57 +7,39 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { MapPin, Loader2, Link, Settings } from 'lucide-react'
 import { toast } from "sonner"
-import { useDevicesStore } from "@/store/devices"
+import { useDeviceRegistration } from "@/hooks/use-device-registration"
 
 interface DirectRegistrationProps {
   onDeviceRegistered: () => void
 }
 
 export function DirectRegistration({ onDeviceRegistered }: DirectRegistrationProps) {
-  const { addDevice } = useDevicesStore()
+  const {
+    isRegistering,
+    isGettingLocation,
+    currentLocation,
+    error,
+    getCurrentLocation,
+    registerDevice,
+    resetLocation,
+    resetError,
+  } = useDeviceRegistration()
+
   const [deviceName, setDeviceName] = useState("")
   const [deviceType, setDeviceType] = useState<"android" | "ios">("android")
-  const [location, setLocation] = useState<[number, number] | null>(null)
-  const [locationName, setLocationName] = useState("")
-  const [isRegistering, setIsRegistering] = useState(false)
-  const [isGettingLocation, setIsGettingLocation] = useState(false)
 
-  const getCurrentLocation = () => {
-    setIsGettingLocation(true)
-    if (!navigator.geolocation) {
-      toast.error("Geolocation is not supported by this browser")
-      setIsGettingLocation(false)
-      return
+  const handleGetLocation = async () => {
+    try {
+      await getCurrentLocation()
+      toast.success("Current location has been set")
+    } catch (error) {
+      console.error("Error getting location:", error)
+      toast.error(error instanceof Error ? error.message : "Unable to get current location")
     }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords: [number, number] = [
-          position.coords.longitude, 
-          position.coords.latitude
-        ]
-        setLocation(coords)
-        setLocationName(
-          `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`
-        )
-        setIsGettingLocation(false)
-        toast.success("Current location has been set")
-      },
-      (error) => {
-        console.error("Error getting location:", error)
-        toast.error("Unable to get current location. Please enter coordinates manually.")
-        setIsGettingLocation(false)
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000,
-      }
-    )
   }
 
-  const registerDevice = async () => {
-    if (!location) {
+  const handleRegisterDevice = async () => {
+    if (!currentLocation) {
       toast.error("Please set device location before registering")
       return
     }
@@ -66,52 +48,31 @@ export function DirectRegistration({ onDeviceRegistered }: DirectRegistrationPro
       return
     }
 
-    setIsRegistering(true)
     try {
-      const payload = {
-        name: deviceName,
-        type: deviceType,
-        location: {
-          type: "Point",
-          coordinates: location,
-        },
-        locationName,
-        registrationMethod: "direct",
+      const newDevice = await registerDevice(deviceName, deviceType, currentLocation)
+      
+      toast.success("Device registered successfully")
+      
+      // Show the reverse geocoded address if available
+      if (newDevice.locationName) {
+        toast.success(`📍 Address: ${newDevice.locationName}`)
       }
-
-      const response = await fetch("https://phone-tracker-be.onrender.com/api/devices/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-        credentials: "include",
-      })
-
-      if (!response.ok) {
-        throw new Error("Device registration failed")
-      }
-
-      const data = await response.json()
-      addDevice(data.device) // Add to Zustand store
-      toast.success(data.message || "Device registered successfully")
       
       // Reset form
       setDeviceName("")
-      setLocation(null)
-      setLocationName("")
+      resetLocation()
       
       // Refresh device list
       onDeviceRegistered()
     } catch (error) {
       console.error("Registration error:", error)
-      toast.error(
-        error instanceof Error ? error.message : "Unable to register device"
-      )
-    } finally {
-      setIsRegistering(false)
+      toast.error(error instanceof Error ? error.message : "Unable to register device")
     }
   }
+
+  const locationDisplay = currentLocation 
+    ? `${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}`
+    : ""
 
   return (
     <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
@@ -130,12 +91,34 @@ export function DirectRegistration({ onDeviceRegistered }: DirectRegistrationPro
             <div>
               <h3 className="text-purple-300 font-medium mb-1">Direct Registration</h3>
               <p className="text-sm text-gray-400">
-                Manually enter device details and location. Use this when you have physical access to
-                configure the device yourself.
+                Manually enter device details and location. The address will be automatically 
+                detected using your coordinates via reverse geocoding.
               </p>
             </div>
           </div>
         </div>
+
+        {/* Show error message if any */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-500/10 border border-red-500/20 rounded-lg p-4"
+          >
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 bg-red-500 rounded-full"></div>
+              <p className="text-red-400 text-sm">{error}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetError}
+                className="ml-auto text-red-400 hover:text-red-300"
+              >
+                ×
+              </Button>
+            </div>
+          </motion.div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -189,7 +172,7 @@ export function DirectRegistration({ onDeviceRegistered }: DirectRegistrationPro
           <div className="flex gap-2">
             <Button
               type="button"
-              onClick={getCurrentLocation}
+              onClick={handleGetLocation}
               disabled={isGettingLocation}
               className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white transition-all duration-300 group disabled:opacity-50"
             >
@@ -205,12 +188,33 @@ export function DirectRegistration({ onDeviceRegistered }: DirectRegistrationPro
                 </>
               )}
             </Button>
+            {currentLocation && (
+              <Button
+                type="button"
+                onClick={resetLocation}
+                variant="outline"
+                className="text-gray-400 hover:text-white border-white/20 hover:border-white/40"
+              >
+                Clear
+              </Button>
+            )}
           </div>
-          {location && (
-            <div className="text-sm text-gray-400 mt-2">
-              <p>📍 {locationName}</p>
-              <p className="text-xs">
-                Coordinates: {location[1].toFixed(6)}, {location[0].toFixed(6)}
+          {currentLocation && (
+            <div className="text-sm text-gray-400 mt-2 p-3 bg-white/5 rounded-lg border border-white/10">
+              <p className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-green-400" />
+                <span className="text-green-400">Location captured</span>
+              </p>
+              <p className="text-xs mt-1">
+                Coordinates: {locationDisplay}
+              </p>
+              {currentLocation.accuracy && (
+                <p className="text-xs mt-1 text-blue-400">
+                  Accuracy: ±{Math.round(currentLocation.accuracy)}m
+                </p>
+              )}
+              <p className="text-xs text-purple-400 mt-1">
+                📍 Address will be automatically detected when registering
               </p>
             </div>
           )}
@@ -222,8 +226,8 @@ export function DirectRegistration({ onDeviceRegistered }: DirectRegistrationPro
           transition={{ delay: 0.4 }}
         >
           <Button
-            onClick={registerDevice}
-            disabled={isRegistering || !deviceName.trim() || !location}
+            onClick={handleRegisterDevice}
+            disabled={isRegistering || !deviceName.trim() || !currentLocation}
             className="w-full bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white transition-all duration-300 group disabled:opacity-50"
           >
             {isRegistering ? (

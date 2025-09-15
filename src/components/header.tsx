@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Smartphone, Menu, X } from "lucide-react"
 import Link from "next/link"
+import { useAuthStore } from "@/store/auth"
 
 interface HeaderProps {
   variant?: "landing" | "auth"
@@ -13,12 +14,25 @@ interface HeaderProps {
 
 export default function Header({ variant = "landing", showNavLinks = true }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { user, isAuthenticated, logout } = useAuthStore() 
 
   const navLinks = [
     { href: "#features", label: "Features" },
     { href: "#testimonials", label: "Reviews" },
     { href: "#pricing", label: "Pricing" },
   ]
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      setIsMenuOpen(false)
+    } catch (error) {
+      console.error("Logout error:", error)
+    }
+  }
+
+ 
+  const hasAccount = !!user?.id
 
   return (
     <motion.nav
@@ -46,32 +60,83 @@ export default function Header({ variant = "landing", showNavLinks = true }: Hea
                   {link.label}
                 </a>
               ))}
-              <Link href="/auth/login">
-                <Button
-                  variant="outline"
-                  className="border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black bg-transparent transition-all duration-200"
-                >
-                  Sign In
-                </Button>
-              </Link>
+              
+              {/* Conditionally render based on whether user has an account */}
+              {isAuthenticated ? (
+               
+                <>
+                  <Link href="/dashboard">
+                    <Button
+                      variant="outline"
+                      className="border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black bg-transparent transition-all duration-200"
+                    >
+                      Dashboard
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    onClick={handleLogout}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    Logout
+                  </Button>
+                </>
+              ) : hasAccount ? (
+                // User has an account but is not logged in - show Login
+                <Link href="/auth/login">
+                  <Button
+                    variant="outline"
+                    className="border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black bg-transparent transition-all duration-200"
+                  >
+                    Login
+                  </Button>
+                </Link>
+              ) : (
+                // User doesn't have an account - show Sign Up
+                <Link href="/auth/signup">
+                  <Button className="bg-blue-500 hover:bg-blue-600 transition-all duration-200">
+                    Sign Up
+                  </Button>
+                </Link>
+              )}
             </div>
           )}
 
           {/* Auth variant - minimal header */}
           {variant === "auth" && (
             <div className="hidden md:flex items-center space-x-4">
-              <Link href="/auth/login" className="text-gray-400 hover:text-white transition-colors">
-                Login
-              </Link>
-              <Link href="/auth/signup">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black bg-transparent"
-                >
-                  Sign Up
-                </Button>
-              </Link>
+              {isAuthenticated ? (
+                // User is logged in - show Dashboard and Logout
+                <>
+                  <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors">
+                    Dashboard
+                  </Link>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLogout}
+                    className="border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black bg-transparent"
+                  >
+                    Logout
+                  </Button>
+                </>
+              ) : hasAccount ? (
+                // User has an account but is not logged in - show Login
+                <Link href="/auth/login" className="text-gray-400 hover:text-white transition-colors">
+                  Login
+                </Link>
+              ) : (
+                // User doesn't have an account - show Sign Up
+                <Link href="/auth/signup">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black bg-transparent"
+                  >
+                    Sign Up
+                  </Button>
+                </Link>
+              )}
             </div>
           )}
 
@@ -105,35 +170,87 @@ export default function Header({ variant = "landing", showNavLinks = true }: Hea
                   </a>
                 ))}
                 <div className="pt-4 border-t border-white/10">
-                  <Link href="/auth/login" onClick={() => setIsMenuOpen(false)}>
-                    <Button
-                      variant="outline"
-                      className="w-full border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black bg-transparent"
-                    >
-                      Sign In
-                    </Button>
-                  </Link>
+                  {isAuthenticated ? (
+                    // User is logged in - show Dashboard and Logout
+                    <>
+                      <Link href="/dashboard" onClick={() => setIsMenuOpen(false)}>
+                        <Button
+                          variant="outline"
+                          className="w-full mb-2 border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black bg-transparent"
+                        >
+                          Dashboard
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        onClick={handleLogout}
+                        className="w-full text-gray-400 hover:text-white"
+                      >
+                        Logout
+                      </Button>
+                    </>
+                  ) : hasAccount ? (
+                    // User has an account but is not logged in - show Login
+                    <Link href="/auth/login" onClick={() => setIsMenuOpen(false)}>
+                      <Button
+                        variant="outline"
+                        className="w-full border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black bg-transparent"
+                      >
+                        Login
+                      </Button>
+                    </Link>
+                  ) : (
+                    // User doesn't have an account - show Sign Up
+                    <Link href="/auth/signup" onClick={() => setIsMenuOpen(false)}>
+                      <Button className="w-full bg-blue-500 hover:bg-blue-600">
+                        Sign Up
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </>
             )}
 
             {variant === "auth" && (
               <div className="space-y-3">
-                <Link
-                  href="/auth/login"
-                  className="block py-2 text-gray-400 hover:text-white transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Login
-                </Link>
-                <Link href="/auth/signup" onClick={() => setIsMenuOpen(false)}>
-                  <Button
-                    variant="outline"
-                    className="w-full border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black bg-transparent"
+                {isAuthenticated ? (
+                  // User is logged in - show Dashboard and Logout
+                  <>
+                    <Link
+                      href="/dashboard"
+                      className="block py-2 text-gray-400 hover:text-white transition-colors"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Dashboard
+                    </Link>
+                    <Button
+                      variant="outline"
+                      onClick={handleLogout}
+                      className="w-full border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black bg-transparent"
+                    >
+                      Logout
+                    </Button>
+                  </>
+                ) : hasAccount ? (
+                  // User has an account but is not logged in - show Login
+                  <Link
+                    href="/auth/login"
+                    className="block py-2 text-gray-400 hover:text-white transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
                   >
-                    Sign Up
-                  </Button>
-                </Link>
+                    Login
+                  </Link>
+                ) : (
+                  // User doesn't have an account - show Sign Up
+                  <Link href="/auth/signup" onClick={() => setIsMenuOpen(false)}>
+                    <Button
+                      variant="outline"
+                      className="w-full border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black bg-transparent"
+                    >
+                      Sign Up
+                    </Button>
+                  </Link>
+                )}
               </div>
             )}
           </div>

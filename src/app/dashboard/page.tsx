@@ -2,13 +2,17 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DashboardOverview } from "@/components/dashboard-overview";
-import { LocationHistory } from "@/components/location-history";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { RealTimeTracking } from "@/components/realtime-tracking";
 import { NotificationSettings } from "@/components/notification-settings";
 import { SettingsPanel } from "@/components/setting-pannel";
 import { DashboardSidebar } from "@/components/sidebar";
 import { DeviceRegistration } from "@/components/device-registration";
+import LocationHistory from "@/components/location-history";
+;
+
+
+
 
 interface Position {
   left: string;
@@ -46,8 +50,8 @@ export default function Dashboard() {
       registration: <DeviceRegistration />,
       history: <LocationHistory />,
       tracking: <RealTimeTracking />,
-      notifications: <NotificationSettings />,
-      settings: <SettingsPanel />,
+      // notifications: <NotificationSettings />,
+      // settings: <SettingsPanel />,
     };
 
     return components[activeSection as keyof typeof components] || <DashboardOverview />;
