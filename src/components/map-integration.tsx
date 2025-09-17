@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { motion } from "framer-motion"
 import { Socket } from "socket.io-client"
 import * as L from "leaflet"
@@ -39,7 +39,6 @@ export function TrackingMap({
   showTrails = false,
   onDeviceClick,
   socket,
-  watchedDeviceIds,
 }: TrackingMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<L.Map | null>(null)
@@ -49,15 +48,14 @@ export function TrackingMap({
   const markersRef = useRef<Map<string, L.Marker>>(new Map())
   const trailsRef = useRef<Map<string, L.Polyline>>(new Map())
 
-  // Format coordinates for display
-  const formatCoordinates = (lat: number, lng: number): string => {
+  // Stable utility functions that don't depend on props/state
+  const formatCoordinates = useCallback((lat: number, lng: number): string => {
     return `${lat.toFixed(4)}° ${lat >= 0 ? "N" : "S"}, ${Math.abs(lng).toFixed(4)}° ${
       lng >= 0 ? "E" : "W"
     }`
-  }
+  }, [])
 
-  // Format last update time
-  const formatLastUpdate = (updatedAt: string): string => {
+  const formatLastUpdate = useCallback((updatedAt: string): string => {
     const now = new Date()
     const updated = new Date(updatedAt)
     const diffSeconds = Math.floor((now.getTime() - updated.getTime()) / 1000)
@@ -66,91 +64,10 @@ export function TrackingMap({
     if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes > 1 ? "s" : ""} ago`
     const diffHours = Math.floor(diffMinutes / 60)
     return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`
-  }
-
-  // Initialize map
-  useEffect(() => {
-    const initializeMap = async () => {
-      try {
-        setIsLoading(true)
-        setError(null)
-
-        if (mapInstanceRef.current) {
-          setMap(mapInstanceRef.current)
-          setIsLoading(false)
-          return
-        }
-
-        if (typeof window !== "undefined") {
-          const link = document.createElement("link")
-          link.rel = "stylesheet"
-          link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-          document.head.appendChild(link)
-        }
-
-        // Fix default marker icons
-        const DefaultIcon = L.Icon.Default as any
-        delete DefaultIcon.prototype._getIconUrl
-        DefaultIcon.mergeOptions({
-          iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-          iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-        })
-
-        if (mapRef.current && !mapInstanceRef.current) {
-          console.log("🗺️ Initializing Leaflet map...")
-
-          const newMapInstance = L.map(mapRef.current, {
-            center: [40.7589, -73.9851] as [number, number], 
-            zoom: 11,
-            zoomControl: true,
-            scrollWheelZoom: true,
-            attributionControl: true,
-          })
-
-          const tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19,
-            tileSize: 256,
-            zoomOffset: 0,
-            crossOrigin: true,
-          })
-
-          tileLayer.on("tileerror", (e: any) => {
-            console.warn("Tile loading error:", e)
-          })
-
-          tileLayer.addTo(newMapInstance)
-
-          mapInstanceRef.current = newMapInstance
-          setMap(newMapInstance)
-          setIsLoading(false)
-
-          console.log("✅ Map initialized successfully")
-        }
-      } catch (err) {
-        console.error("❌ Error initializing map:", err)
-        setError("Failed to load map")
-        setIsLoading(false)
-      }
-    }
-
-    if (mapRef.current) {
-      initializeMap()
-    }
-
-    return () => {
-      if (mapInstanceRef.current) {
-        console.log("🧹 Cleaning up map instance")
-        mapInstanceRef.current.remove()
-        mapInstanceRef.current = null
-        setMap(null)
-      }
-    }
   }, [])
 
-  // Create custom marker icon
-  const createMarkerIcon = (isOnline: boolean = true) => {
+  // Create custom marker icon - stable function
+  const createMarkerIcon = useCallback((isOnline: boolean = true) => {
     const color = isOnline ? "#10b981" : "#6b7280" // Green for online, gray for offline
     return L.divIcon({
       html: `
@@ -185,10 +102,10 @@ export function TrackingMap({
       iconSize: [20, 20] as [number, number],
       iconAnchor: [10, 10] as [number, number],
     })
-  }
+  }, [])
 
-  // Create popup content
-  const createPopupContent = (device: Device, lat: number, lng: number, lastUpdate: string) => {
+  // Create popup content - stable function
+  const createPopupContent = useCallback((device: Device, lat: number, lng: number, lastUpdate: string) => {
     return `
       <div style="min-width: 200px; font-family: system-ui;">
         <div style="font-weight: 600; color: #1f2937; margin-bottom: 8px; font-size: 14px;">
@@ -215,10 +132,34 @@ export function TrackingMap({
         </div>
       </div>
     `
-  }
+  }, [formatCoordinates])
 
-  // Update marker position and info
-  const updateMarker = (deviceId: string, lat: number, lng: number, device: Device, lastUpdate: string) => {
+  // Update trail polyline - stable function
+  const updateTrail = useCallback((deviceId: string, trail: Array<{ lat: number; lng: number; timestamp: string }>) => {
+    if (!map || !trail || trail.length < 2) return
+
+    console.log(`🛤️ Updating trail for device ${deviceId} with ${trail.length} points`)
+
+    // Remove existing trail
+    const existingTrail = trailsRef.current.get(deviceId)
+    if (existingTrail) {
+      map.removeLayer(existingTrail)
+    }
+
+    // Create new trail polyline
+    const coordinates = trail.map(point => [point.lat, point.lng] as [number, number])
+    const polyline = L.polyline(coordinates, {
+      color: "#3b82f6",
+      weight: 3,
+      opacity: 0.7,
+      smoothFactor: 1,
+    }).addTo(map)
+
+    trailsRef.current.set(deviceId, polyline)
+  }, [map])
+
+  // Update marker position and info - now includes all dependencies
+  const updateMarker = useCallback((deviceId: string, lat: number, lng: number, device: Device, lastUpdate: string) => {
     if (!map) return
 
     console.log(`🎯 Updating marker for device ${deviceId} at [${lat}, ${lng}]`)
@@ -261,33 +202,90 @@ export function TrackingMap({
     if (showTrails && device.trail && device.trail.length > 1) {
       updateTrail(deviceId, device.trail)
     }
-  }
+  }, [map, onDeviceClick, showTrails, createMarkerIcon, createPopupContent, updateTrail])
 
-  // Update trail polyline
-  const updateTrail = (deviceId: string, trail: Array<{ lat: number; lng: number; timestamp: string }>) => {
-    if (!map || !trail || trail.length < 2) return
+  // Initialize map
+  useEffect(() => {
+    const initializeMap = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
 
-    console.log(`🛤️ Updating trail for device ${deviceId} with ${trail.length} points`)
+        if (mapInstanceRef.current) {
+          setMap(mapInstanceRef.current)
+          setIsLoading(false)
+          return
+        }
 
-    // Remove existing trail
-    const existingTrail = trailsRef.current.get(deviceId)
-    if (existingTrail) {
-      map.removeLayer(existingTrail)
+        if (typeof window !== "undefined") {
+          const link = document.createElement("link")
+          link.rel = "stylesheet"
+          link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          document.head.appendChild(link)
+        }
+
+        // Fix default marker icons - Fixed TypeScript error
+        const DefaultIcon = L.Icon.Default
+        delete (DefaultIcon.prototype as unknown as Record<string, unknown>)._getIconUrl
+        DefaultIcon.mergeOptions({
+          iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+          iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+        })
+
+        if (mapRef.current && !mapInstanceRef.current) {
+          console.log("🗺️ Initializing Leaflet map...")
+
+          const newMapInstance = L.map(mapRef.current, {
+            center: [40.7589, -73.9851] as [number, number], 
+            zoom: 11,
+            zoomControl: true,
+            scrollWheelZoom: true,
+            attributionControl: true,
+          })
+
+          const tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19,
+            tileSize: 256,
+            zoomOffset: 0,
+            crossOrigin: true,
+          })
+
+          tileLayer.on("tileerror", (e: L.TileErrorEvent) => {
+            console.warn("Tile loading error:", e)
+          })
+
+          tileLayer.addTo(newMapInstance)
+
+          mapInstanceRef.current = newMapInstance
+          setMap(newMapInstance)
+          setIsLoading(false)
+
+          console.log("✅ Map initialized successfully")
+        }
+      } catch (err) {
+        console.error("❌ Error initializing map:", err)
+        setError("Failed to load map")
+        setIsLoading(false)
+      }
     }
 
-    // Create new trail polyline
-    const coordinates = trail.map(point => [point.lat, point.lng] as [number, number])
-    const polyline = L.polyline(coordinates, {
-      color: "#3b82f6",
-      weight: 3,
-      opacity: 0.7,
-      smoothFactor: 1,
-    }).addTo(map)
+    if (mapRef.current) {
+      initializeMap()
+    }
 
-    trailsRef.current.set(deviceId, polyline)
-  }
+    return () => {
+      if (mapInstanceRef.current) {
+        console.log("🧹 Cleaning up map instance")
+        mapInstanceRef.current.remove()
+        mapInstanceRef.current = null
+        setMap(null)
+      }
+    }
+  }, [])
 
-  // Handle WebSocket location updates - THIS IS CRITICAL
+  // Handle WebSocket location updates - moved formatLastUpdate inside
   useEffect(() => {
     if (!socket || !map) {
       console.log("⚠️ Socket or map not available for location updates")
@@ -300,7 +298,7 @@ export function TrackingMap({
       console.log("📍 Map received location update:", payload)
       
       try {
-        const { deviceId, location, locationName, updatedAt } = payload
+        const { deviceId, location, updatedAt } = payload
 
         // Extract coordinates
         let lat: number, lng: number
@@ -356,7 +354,7 @@ export function TrackingMap({
       socket.off("locationUpdate", handleLocationUpdate)
       socket.off("deviceNotification", handleDeviceNotification)
     }
-  }, [socket, map, devices, showTrails, onDeviceClick])
+  }, [socket, map, devices, updateMarker, formatLastUpdate])
 
   // Update markers when devices change (initial load and status updates)
   useEffect(() => {
@@ -421,7 +419,7 @@ export function TrackingMap({
     }
 
     updateAllMarkers()
-  }, [map, devices, showTrails, onDeviceClick])
+  }, [map, devices, updateMarker])
 
   if (error) {
     return (

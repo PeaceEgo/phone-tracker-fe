@@ -11,7 +11,6 @@ const VerifyEmailContent = () => {
   const [email, setEmail] = useState("")
   const [otp, setOtp] = useState("")
   
-  // Use Zustand store instead of local state and direct API calls
   const { 
     verifyEmail, 
     resendVerification, 
@@ -20,7 +19,6 @@ const VerifyEmailContent = () => {
     verificationSuccess,
     clearError,
     clearVerificationSuccess,
-    needsVerification,
     verificationEmail
   } = useAuthStore()
 
@@ -213,7 +211,7 @@ const VerifyEmailContent = () => {
 
             <div className="text-center mt-6">
               <p className="text-gray-400 text-sm mb-3">
-                Didn't receive the code?
+                Didn &apos;t receive the code?
               </p>
               <button
                 type="button"

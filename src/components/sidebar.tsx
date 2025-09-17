@@ -13,7 +13,7 @@ import {
   SidebarRail,
   SidebarFooter,
 } from "@/components/ui/sidebar"
-import { LayoutDashboard, Smartphone, MapPin, Radio, Bell, Settings, User, LogOut } from "lucide-react"
+import { LayoutDashboard, Smartphone, MapPin, Radio, User, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/auth"

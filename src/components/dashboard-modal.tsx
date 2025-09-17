@@ -10,6 +10,7 @@ import { useState } from "react";
 import { useDevicesStore, Device } from "@/store/devices";
 import { useDeviceRegistration } from "@/hooks/use-device-registration";
 
+
 interface LocationEntry {
   _id: string;
   locationName: string;
@@ -95,8 +96,9 @@ export function DashboardModal({ isOpen, onClose, type, onDeviceRegistered }: Mo
       
       const data = await fetchLocationHistory(device.deviceId);
       setLocationHistory(data.history || []);
-    } catch (err: any) {
-      setHistoryError(err.message || 'Failed to fetch location history');
+    } catch (err: unknown) {
+      console.error('Error fetching location history:', err);
+      setHistoryError((err as Error)?.message || 'Failed to fetch location history');
       setLocationHistory([]);
     } finally {
       setHistoryLoading(false);
@@ -104,7 +106,7 @@ export function DashboardModal({ isOpen, onClose, type, onDeviceRegistered }: Mo
   };
 
   const renderRegisterContent = () => (
-    <div className="space-y-6">
+    <div className="space-y-6"> 
       <div className="text-center">
         <div className="p-3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl border border-blue-500/30 inline-flex mb-4">
           <Smartphone className="h-8 w-8 text-blue-400" />
@@ -317,7 +319,7 @@ export function DashboardModal({ isOpen, onClose, type, onDeviceRegistered }: Mo
             <div className="text-center py-8">
               <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-400">No location history found</p>
-              <p className="text-gray-500 text-sm">This device hasn't reported any locations yet</p>
+              <p className="text-gray-500 text-sm">This device hasn &apos;t reported any locations yet</p>
             </div>
           ) : (
             <div className="max-h-96 overflow-y-auto space-y-3">

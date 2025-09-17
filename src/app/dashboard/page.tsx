@@ -4,8 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { DashboardOverview } from "@/components/dashboard-overview";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { RealTimeTracking } from "@/components/realtime-tracking";
-import { NotificationSettings } from "@/components/notification-settings";
-import { SettingsPanel } from "@/components/setting-pannel";
 import { DashboardSidebar } from "@/components/sidebar";
 import { DeviceRegistration } from "@/components/device-registration";
 import LocationHistory from "@/components/location-history";

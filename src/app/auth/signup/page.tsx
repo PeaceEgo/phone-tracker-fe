@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { motion } from "framer-motion"
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { registerSchema, type RegisterFormData } from "@/lib/validation"
 import { useAuthStore } from "@/store/auth"
 import { Button } from "@/components/ui/button"
@@ -31,12 +31,14 @@ const SignUp = () => {
     resolver: zodResolver(registerSchema),
   })
 
-  // Reset verification state when component mounts
-  useEffect(() => {
-    if (needsVerification) {
-      setNeedsVerification(false)
-    }
-  }, []) // Empty dependency array = run only on mount
+const hasReset = useRef(false)
+
+useEffect(() => {
+  if (needsVerification && !hasReset.current) {
+    setNeedsVerification(false)
+    hasReset.current = true
+  }
+}, [needsVerification, setNeedsVerification])
 
   // Move the redirect logic to useEffect - only redirect AFTER successful registration
   useEffect(() => {
@@ -52,7 +54,7 @@ const SignUp = () => {
       // The auth store will set needsVerification and verificationEmail
       // The useEffect above will handle the redirect automatically
     } catch (error) {
-      // Error is already handled in the store
+      console.error('Registration failed:', error)
     }
   }
 
@@ -134,7 +136,7 @@ const SignUp = () => {
                   Create Account
                 </h2>
                 <p className="text-gray-400">
-                  Once you're set up, just verify your email and log in from any device.
+                  Once you &apos;re set up, just verify your email and log in from any device.
                 </p>
               </div>
 

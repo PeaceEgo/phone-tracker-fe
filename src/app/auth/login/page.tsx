@@ -36,7 +36,7 @@ const Login = () => {
       await login(data.email, data.password);
       router.push("/dashboard");
     } catch (error) {
-      
+      console.error('Login failed:', error);
     }
   };
 
@@ -181,7 +181,7 @@ const Login = () => {
               >
                 <div className="text-center text-sm text-gray-400">
                   <p>
-                    Don't have an account yet?{" "}
+                    Don &apos;t have an account yet?{" "}
                     <Link href="/auth/signup" className="text-blue-400 hover:text-blue-300 transition-colors">
                       Sign Up
                     </Link>

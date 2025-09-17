@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { QrCode, Loader2, Copy, RefreshCw, Target, MapPin } from 'lucide-react'
 import { toast } from "sonner"
+import Image from "next/image"
 
 interface QRCodeData {
   qrCodeId: string
@@ -87,8 +88,8 @@ export function QRCodeRegistration({ onDeviceRegistered }: QRCodeRegistrationPro
         // Notify parent that a device might be registered soon
         onDeviceRegistered()
       }
-    } catch (error) {
-      console.error("QR generation error:", error)
+    } catch (err) {
+      console.error("QR generation error:", err)
       toast.error("Unable to generate QR code. Please try again.")
     } finally {
       setIsGeneratingQR(false)
@@ -102,13 +103,13 @@ export function QRCodeRegistration({ onDeviceRegistered }: QRCodeRegistrationPro
     setIsRegeneratingQR(false)
   }
 
- 
   const copyLinkingUrl = async () => {
     if (qrCodeData?.qrCodeId) {
       try {
         await navigator.clipboard.writeText(`trackguard://link-device/${qrCodeData.qrCodeId}`)
         toast.success("Linking URL copied to clipboard!")
-      } catch (error) {
+      } catch (err) {
+        console.error("Clipboard copy error:", err)
         toast.error("Failed to copy URL")
       }
     }
@@ -249,9 +250,11 @@ export function QRCodeRegistration({ onDeviceRegistered }: QRCodeRegistrationPro
                     transition={{ delay: 0.2, type: "spring" }}
                     className="mx-auto mb-4 rounded-lg flex items-center justify-center"
                   >
-                    <img
+                    <Image
                       src={qrCodeData.qrCodeImage}
                       alt="Device Registration QR Code"
+                      width={192}
+                      height={192}
                       className="w-48 h-48 rounded-lg shadow-lg border border-white/10"
                     />
                   </motion.div>

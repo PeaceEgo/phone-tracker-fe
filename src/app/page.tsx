@@ -138,7 +138,7 @@ export default function LandingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              The most powerful phone monitoring software on the planet. Keep your family safe with tomorrow's
+              The most powerful phone monitoring software on the planet. Keep your family safe with tomorrow &apos;s
               technology, today.
             </motion.p>
 
@@ -254,7 +254,7 @@ export default function LandingPage() {
                         <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
                       ))}
                     </div>
-                    <p className="text-gray-300 mb-4 italic">"{testimonial.content}"</p>
+                    <p className="text-gray-300 mb-4 italic">&quot;{testimonial.content}&quot;</p>
                     <div>
                       <p className="font-semibold text-white">{testimonial.name}</p>
                       <p className="text-sm text-gray-400">{testimonial.role}</p>
