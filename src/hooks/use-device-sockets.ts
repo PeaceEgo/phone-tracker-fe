@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useDevicesStore } from "@/store/devices";
 
@@ -10,6 +10,17 @@ interface LocationTrackingOptions {
   timeout?: number;
 }
 
+interface BatteryManager {
+  charging: boolean;
+  chargingTime: number;
+  dischargingTime: number;
+  level: number;
+}
+
+interface NavigatorWithBattery extends Navigator {
+  getBattery: () => Promise<BatteryManager>;
+}
+  
 export function useDeviceSocket(
   deviceIds: string[], 
   options: LocationTrackingOptions = {}
@@ -30,8 +41,8 @@ export function useDeviceSocket(
     timeout = 10000 
   } = options;
 
-  
-  const sendCurrentLocation = (socket: Socket, deviceId: string, force = false) => {
+  // Wrap sendCurrentLocation in useCallback to prevent unnecessary recreations
+  const sendCurrentLocation = useCallback((socket: Socket, deviceId: string, force = false) => {
     if (!navigator.geolocation) {
       console.warn("Geolocation is not supported by this browser");
       return;
@@ -49,7 +60,7 @@ export function useDeviceSocket(
       
         let batteryLevel: number | undefined;
         if ('getBattery' in navigator) {
-          (navigator as any).getBattery().then((battery: any) => {
+          (navigator as NavigatorWithBattery).getBattery().then((battery: BatteryManager) => {
             batteryLevel = Math.round(battery.level * 100);
           });
         }
@@ -95,7 +106,7 @@ export function useDeviceSocket(
       },
       geoOptions
     );
-  };
+  }, [highAccuracy, maxAge, timeout]); // Add dependencies that are used inside the callback
 
   // Check location permission
   useEffect(() => {
@@ -238,17 +249,23 @@ export function useDeviceSocket(
       socketRef.current = null;
       setIsTracking(false);
     };
-  }, [deviceIds.join(","), updateDevice, enableTracking, locationPermission, updateInterval, highAccuracy, maxAge, timeout]);
+  }, [
+    deviceIds, 
+    updateDevice, 
+    enableTracking, 
+    locationPermission, 
+    updateInterval, 
+    sendCurrentLocation // Add sendCurrentLocation to the dependency array
+  ]);
 
-  // Function to manually send location update
-  const sendLocationUpdate = (deviceId: string, force = false) => {
+  const sendLocationUpdate = useCallback((deviceId: string, force = false) => {
     if (socketRef.current && socketRef.current.connected) {
       sendCurrentLocation(socketRef.current, deviceId, force);
     }
-  };
+  }, [sendCurrentLocation]);
 
   // Function to start/stop tracking
-  const toggleTracking = () => {
+  const toggleTracking = useCallback(() => {
     if (!socketRef.current) return;
 
     if (isTracking && intervalRef.current) {
@@ -263,7 +280,7 @@ export function useDeviceSocket(
       }, updateInterval);
       setIsTracking(true);
     }
-  };
+  }, [isTracking, locationPermission, deviceIds, sendCurrentLocation, updateInterval]);
 
   return {
     socket: socketRef.current,

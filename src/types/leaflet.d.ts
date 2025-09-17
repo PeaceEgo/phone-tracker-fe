@@ -8,3 +8,4 @@ declare module "leaflet" {
     isTrail?: boolean;
   }
 }
+export type LeafletNamespace = typeof L;

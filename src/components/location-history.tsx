@@ -29,6 +29,18 @@ interface Device {
   locationName: string;
 }
 
+interface LocationHistoryEntry {
+  _id: string;
+  locationName?: string;
+  location: { coordinates: [number, number] };
+  recordedAt?: string;
+  timestamp?: string;
+  accuracy?: number;
+  batteryLevel?: number;
+  duration?: string;
+  activity?: string;
+}
+
 export default function LocationHistory() {
   const [device, setDevice] = useState<Device | null>(null);
   const [locationData, setLocationData] = useState<Location[]>([]);
@@ -40,15 +52,14 @@ export default function LocationHistory() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const { isTracking, locationPermission, sendLocationUpdate, toggleTracking } = useDeviceSocket(
-    device ? [device.deviceId] : [],
-    {
-      enableTracking: true,
-      updateInterval: 30000,
-      highAccuracy: true
-    }
-  );
-  
+ const { } = useDeviceSocket(
+  device ? [device.deviceId] : [],
+  {
+    enableTracking: true,
+    updateInterval: 30000,
+    highAccuracy: true
+  }
+);
   const paginationData = useMemo(() => {
     const totalItems = locationData.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -97,7 +108,8 @@ export default function LocationHistory() {
 
       const locationArray = Array.isArray(historyData) ? historyData : historyData.history || historyData.locations || [];
 
-      const history: Location[] = locationArray.map((entry: any) => ({
+      // Fix: Use proper type instead of 'any'
+      const history: Location[] = locationArray.map((entry: LocationHistoryEntry) => ({
         id: entry._id,
         device: selectedDevice.name,
         location: entry.locationName || "Unknown",
@@ -106,7 +118,7 @@ export default function LocationHistory() {
           lat: entry.location.coordinates[1],
           lng: entry.location.coordinates[0],
         },
-        timestamp: new Date(entry.recordedAt || entry.timestamp).toLocaleString(),
+        timestamp: new Date(entry.recordedAt || entry.timestamp || Date.now()).toLocaleString(),
         accuracy: entry.accuracy ? `${entry.accuracy}m` : "Unknown",
         battery: entry.batteryLevel || 100,
         duration: entry.duration || "Unknown",
@@ -116,8 +128,10 @@ export default function LocationHistory() {
       setLocationData(history);
       setError(null);
       setCurrentPage(1);
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch data");
+    } catch (err: unknown) {
+      // Fix: Proper error type handling
+      const errorMessage = err instanceof Error ? err.message : "Failed to fetch data";
+      setError(errorMessage);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -192,7 +206,7 @@ export default function LocationHistory() {
   ];
 
   const getPageNumbers = () => {
-    const pages = [];
+    const pages: (number | string)[] = [];
     const { totalPages } = paginationData;
     
     if (totalPages <= 5) {

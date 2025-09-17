@@ -4,8 +4,10 @@ import {
   loginUser, 
   registerUser, 
   logoutUser, 
-  verifyEmail as verifyEmailAPI,  // Rename to avoid conflict
-  resendVerificationEmail 
+  verifyEmail as verifyEmailAPI,
+  resendVerificationEmail,
+  // type AuthResponse,
+  type EmailVerificationResponse
 } from '@/lib/api'
 import { useDevicesStore } from './devices'
 
@@ -21,6 +23,16 @@ interface RegisterParams {
   password: string
 }
 
+// Add interface for registration response
+interface RegisterResponse {
+  message: string
+  user?: {
+    id: string
+    email: string
+    fullName: string
+  }
+}
+
 interface AuthState {
   user: User | null
   isAuthenticated: boolean
@@ -33,13 +45,13 @@ interface AuthState {
   verificationSentAt?: string
 
   login: (email: string, password: string) => Promise<void>
-  register: (formData: RegisterParams) => Promise<any>
+  register: (formData: RegisterParams) => Promise<RegisterResponse>
   setUser: (user: User | null) => void
   logout: () => Promise<void>
   clearError: () => void
   initializeAuth: () => void
-  verifyEmail: (otp: string) => Promise<any>
-  resendVerification: (email: string) => Promise<any>
+  verifyEmail: (otp: string) => Promise<EmailVerificationResponse>
+  resendVerification: (email: string) => Promise<{ message: string }>
   setNeedsVerification: (needsVerification: boolean, email?: string) => void
   clearVerificationSuccess: () => void
 }
@@ -141,7 +153,6 @@ export const useAuthStore = create<AuthState>()(
       verifyEmail: async (otp: string) => {
         set({ isLoading: true, error: null })
         try {
-          // Use the imported API function with renamed import
           const result = await verifyEmailAPI(otp)
           set({
             needsVerification: false,

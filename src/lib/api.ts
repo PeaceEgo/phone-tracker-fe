@@ -7,6 +7,17 @@ export interface AuthResponse {
   }
 }
 
+export interface EmailVerificationResponse {
+  message: string
+  user?: {
+    id: string
+    email: string
+    fullName: string
+    isVerified: boolean
+  }
+  token?: string
+}
+
 export async function fetchWithCreds(input: RequestInfo, init: RequestInit = {}) {
   const headers = new Headers(init.headers || {});
   
@@ -113,7 +124,7 @@ export async function loginUser(data: { email: string; password: string }): Prom
   return loginData;
 }
 
-export const verifyEmail = async (otp: string): Promise<any> => {
+export const verifyEmail = async (otp: string): Promise<EmailVerificationResponse> => {
   const response = await fetchWithAutoRefresh(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-email`, {
     method: 'POST',
     body: JSON.stringify({ otp }),

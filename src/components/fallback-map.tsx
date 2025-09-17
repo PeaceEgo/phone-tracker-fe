@@ -30,7 +30,7 @@ export function FallbackMap({ devices, height = "h-[600px]", onRetry }: Fallback
       </div>
       <h3 className="text-xl font-bold text-white mb-2">Map Loading Failed</h3>
       <p className="text-gray-400 mb-6 max-w-md">
-        We couldn't load the map component. This could be due to network issues or browser compatibility.
+        We couldn &apos;t load the map component. This could be due to network issues or browser compatibility.
       </p>
 
       <div className="mb-8">

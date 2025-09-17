@@ -142,7 +142,7 @@ export default function OTPVerification({
 
             <div className="text-center mt-6">
               <p className="text-gray-400 text-sm mb-3">
-                Didn't receive the code?
+                Didn &apos;t receive the code?
               </p>
               <button
                 type="button"

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Smartphone, MapPin, Activity, Plus, RefreshCw, Battery, Clock } from "lucide-react";
+import { Smartphone, MapPin, Activity, Plus, RefreshCw, Clock } from "lucide-react";
 import { useDevicesStore } from "@/store/devices";
 import { DashboardModal } from "./dashboard-modal";
 import { useDeviceSocket } from "@/hooks/use-device-sockets";
@@ -96,7 +96,7 @@ export function DashboardOverview() {
     };
 
     loadDevicesAndLocationData();
-  }, [fetchDevices, devices.length, fetchLocationHistory, updateOnlineStatusFromHistory]);
+  }, [fetchDevices, devices, fetchLocationHistory, updateOnlineStatusFromHistory]);
 
   // Refresh handler using store method
   const handleRefresh = async () => {
