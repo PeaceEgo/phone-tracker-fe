@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,11 +16,16 @@ interface Position {
 }
 
 export default function LandingPage() {
+  const router = useRouter();
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [isClient, setIsClient] = useState(false);
+
+  const handleSignUp = () => {
+    router.push('/auth/signup');
+  };
 
   useEffect(() => {
     // Set client flag and generate positions
@@ -151,8 +157,9 @@ export default function LandingPage() {
               <Button
                 size="lg"
                 className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 text-lg group"
+                onClick={handleSignUp}
               >
-                Start Free Trial
+                Start Today!
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
 
@@ -286,8 +293,9 @@ export default function LandingPage() {
               <Button
                 size="lg"
                 className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 text-lg group"
+                onClick={handleSignUp}
               >
-                Start Your Free Trial
+                Start Today!
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
 
