@@ -2,18 +2,19 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Smartphone, ArrowRight, Mail, Lock } from "lucide-react";
+import { Smartphone, ArrowRight, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { LoginFormData, loginSchema } from "@/lib/validation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react"; // Added useState import
 
 const Login = () => {
   const router = useRouter();
   const { login, isLoading, error, clearError, needsVerification, verificationEmail } = useAuthStore();
+  const [showPassword, setShowPassword] = useState(false); // State for password visibility
   
   const {
     register,
@@ -142,17 +143,44 @@ const Login = () => {
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"} // Toggle input type
                       placeholder="Password"
-                      className={`w-full pl-12 pr-4 py-3 bg-white/5 border ${
+                      className={`w-full pl-12 pr-12 py-3 bg-white/5 border ${
                         errors.password ? "border-red-500" : "border-white/20"
                       } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-400 transition-all duration-300 hover:border-white/30`}
                       {...register("password")}
                     />
+                    {/* Eye icon to toggle password visibility */}
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
                     {errors.password && (
                       <p className="text-red-400 text-sm mt-1">{errors.password.message}</p>
                     )}
                   </div>
+                </motion.div>
+
+                {/* Show password checkbox */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.45 }}
+                  className="flex items-center"
+                >
+                  <input
+                    type="checkbox"
+                    id="show-password"
+                    checked={showPassword}
+                    onChange={() => setShowPassword(!showPassword)}
+                    className="w-4 h-4 rounded bg-white/5 border-white/20 focus:ring-blue-500 focus:ring-offset-gray-900"
+                  />
+                  <label htmlFor="show-password" className="ml-2 text-sm text-gray-400">
+                    Show password
+                  </label>
                 </motion.div>
 
                 {/* Submit button */}
