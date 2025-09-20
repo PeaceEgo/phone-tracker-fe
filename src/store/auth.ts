@@ -7,7 +7,8 @@ import {
   verifyEmail as verifyEmailAPI,
   resendVerificationEmail,
   // type AuthResponse,
-  type EmailVerificationResponse
+  type EmailVerificationResponse,
+  getCurrentUser
 } from '@/lib/api'
 import { useDevicesStore } from './devices'
 
@@ -80,17 +81,35 @@ export const useAuthStore = create<AuthState>()(
           verificationEmail: email || null
         }),
 
-      initializeAuth: () => {
-        const state = get()
-        if (state.isInitialized) return
+initializeAuth: async () => {
+  const state = get()
+  if (state.isInitialized) return
 
-        console.log('🚀 Initializing auth state from storage...')
+  console.log('🚀 Initializing auth state from storage...')
 
-        set({
-          isInitialized: true
-        })
-      },
-
+  try {
+    // Check if there is a valid session on app load
+    const user = await getCurrentUser();
+    if (user) {
+      set({
+        user: {
+          id: user.id,
+          name: user.fullName, 
+          email: user.email
+        },
+        isAuthenticated: true,
+        isInitialized: true,
+        isLoading: false
+      });
+      console.log('✅ Re-authenticated from existing session');
+    } else {
+      set({ isInitialized: true, isLoading: false });
+    }
+  } catch (error) {
+    console.error('❌ Session initialization failed:', error);
+    set({ isInitialized: true, isLoading: false });
+  }
+},
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null })
         try {

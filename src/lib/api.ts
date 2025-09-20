@@ -177,7 +177,7 @@ export async function logoutUser(): Promise<void> {
   if (!res.ok) throw new Error((await res.json()).message || 'Logout failed');
 }
 
-export async function getCurrentUser(): Promise<AuthResponse['user'] | null> {
+export async function getCurrentUser(): Promise<{ id: string; email: string; fullName: string } | null> {
   try {
     console.log('🔍 Checking current user session...');
     
@@ -185,14 +185,20 @@ export async function getCurrentUser(): Promise<AuthResponse['user'] | null> {
       method: 'GET',
     });
     
+    if (res.status === 401) {
+      console.log('❌ Session expired during getCurrentUser');
+      return null;
+    }
+    
     if (!res.ok) {
-      console.log('❌ No valid session found');
+      console.log('❌ Server error during getCurrentUser:', res.status);
       return null;
     }
     
     const data = await res.json();
-    console.log('✅ Session valid, user:', data.user);
-    return data.user;
+    console.log('✅ Session valid, user data:', data);
+  
+    return data.user || null;
   } catch (error) {
     console.error('❌ Session check failed:', error);
     return null;
