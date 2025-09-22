@@ -10,7 +10,6 @@ import { useState } from "react";
 import { useDevicesStore, Device } from "@/store/devices";
 import { useDeviceRegistration } from "@/hooks/use-device-registration";
 
-
 interface LocationEntry {
   _id: string;
   locationName: string;
@@ -381,11 +380,11 @@ export function DashboardModal({ isOpen, onClose, type, onDeviceRegistered }: Mo
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            className="w-full max-w-md bg-black/90 border border-slate-600/50 rounded-xl shadow-2xl"
+            className="w-full max-w-md max-h-[90vh] bg-black/90 border border-slate-600/50 rounded-xl shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center justify-between p-6 pb-0">
                 <div /> {/* Spacer */}
                 <Button
                   onClick={onClose}
@@ -397,8 +396,11 @@ export function DashboardModal({ isOpen, onClose, type, onDeviceRegistered }: Mo
                   <X className="w-5 h-5" />
                 </Button>
               </div>
-
-              {type === 'register' ? renderRegisterContent() : renderHistoryContent()}
+              
+              {/* Scrollable content container */}
+              <div className="flex-1 overflow-y-auto p-6 pt-4">
+                {type === 'register' ? renderRegisterContent() : renderHistoryContent()}
+              </div>
             </div>
           </motion.div>
         </motion.div>
