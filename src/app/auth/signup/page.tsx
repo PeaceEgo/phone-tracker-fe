@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { motion } from "framer-motion"
-import { useEffect, useRef, useState } from "react" // Added useState import
+import { useEffect, useState } from "react"
 import { registerSchema, type RegisterFormData } from "@/lib/validation"
 import { useAuthStore } from "@/store/auth"
 import { Button } from "@/components/ui/button"
@@ -15,14 +15,15 @@ const SignUp = () => {
   const router = useRouter()
   const { 
     register: registerUser, 
-    isLoading, 
+    isLoading: isRegistering, 
     error, 
     clearError, 
     needsVerification, 
     verificationEmail,
-    setNeedsVerification
+    user
   } = useAuthStore()
-  const [showPassword, setShowPassword] = useState(false) // State for password visibility
+  const [showPassword, setShowPassword] = useState(false)
+  const [isRedirecting, setIsRedirecting] = useState(false)
   
   const {
     register,
@@ -32,36 +33,30 @@ const SignUp = () => {
     resolver: zodResolver(registerSchema),
   })
 
-const hasReset = useRef(false)
-
-useEffect(() => {
-  if (needsVerification && !hasReset.current) {
-    setNeedsVerification(false)
-    hasReset.current = true
-  }
-}, [needsVerification, setNeedsVerification])
-
-  // Move the redirect logic to useEffect - only redirect AFTER successful registration
+  // Redirect if already authenticated
   useEffect(() => {
-    if (needsVerification && verificationEmail) {
+    if (user && !isRedirecting) {
+      setIsRedirecting(true)
+      router.push("/dashboard")
+    }
+  }, [user, router, isRedirecting])
+
+  // Redirect after successful registration
+  useEffect(() => {
+    if (needsVerification && verificationEmail && !isRedirecting) {
+      setIsRedirecting(true)
       router.push(`/auth/verify-email?email=${encodeURIComponent(verificationEmail)}`)
     }
-  }, [needsVerification, verificationEmail, router])
+  }, [needsVerification, verificationEmail, router, isRedirecting])
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
       clearError()
       await registerUser(data)
-      // The auth store will set needsVerification and verificationEmail
-      // The useEffect above will handle the redirect automatically
+      // The redirect will be handled by the useEffect above
     } catch (error) {
       console.error('Registration failed:', error)
     }
-  }
-
-  // Don't render if redirecting (only after successful registration)
-  if (needsVerification && verificationEmail) {
-    return null
   }
 
   return (
@@ -213,7 +208,7 @@ useEffect(() => {
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
-                      type={showPassword ? "text" : "password"} // Toggle input type
+                      type={showPassword ? "text" : "password"}
                       placeholder="Password"
                       {...register("password")}
                       className={`w-full pl-12 pr-12 py-3 bg-white/5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-400 transition-all duration-300 ${
@@ -267,13 +262,13 @@ useEffect(() => {
                 >
                   <Button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isRegistering || isRedirecting}
                     className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 text-lg font-semibold group disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isLoading ? (
+                    {isRegistering || isRedirecting ? (
                       <>
                         <Loader2 className="mr-2 w-5 h-5 animate-spin" />
-                        Creating Account...
+                        {isRedirecting ? "Redirecting..." : "Creating Account..."}
                       </>
                     ) : (
                       <>

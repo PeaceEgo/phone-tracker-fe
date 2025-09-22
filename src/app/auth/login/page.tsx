@@ -2,19 +2,28 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Smartphone, ArrowRight, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Smartphone, ArrowRight, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { LoginFormData, loginSchema } from "@/lib/validation";
-import { useEffect, useState } from "react"; // Added useState import
+import { useEffect, useState } from "react";
 
 const Login = () => {
   const router = useRouter();
-  const { login, isLoading, error, clearError, needsVerification, verificationEmail } = useAuthStore();
-  const [showPassword, setShowPassword] = useState(false); // State for password visibility
+  const { 
+    login, 
+    isLoading: isLoggingIn, 
+    error, 
+    clearError, 
+    needsVerification, 
+    verificationEmail,
+    user
+  } = useAuthStore();
+  const [showPassword, setShowPassword] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   
   const {
     register,
@@ -24,18 +33,27 @@ const Login = () => {
     resolver: zodResolver(loginSchema),
   });
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user && !isRedirecting) {
+      setIsRedirecting(true);
+      router.push("/dashboard");
+    }
+  }, [user, router, isRedirecting]);
+
   // Redirect if user needs verification
   useEffect(() => {
-    if (needsVerification && verificationEmail) {
+    if (needsVerification && verificationEmail && !isRedirecting) {
+      setIsRedirecting(true);
       router.push(`/auth/verify-email?email=${encodeURIComponent(verificationEmail)}`);
     }
-  }, [needsVerification, verificationEmail, router]);
+  }, [needsVerification, verificationEmail, router, isRedirecting]);
 
   const onSubmit = async (data: LoginFormData) => {
     try {
       clearError();
       await login(data.email, data.password);
-      router.push("/dashboard");
+      // The redirect will be handled by the useEffect above
     } catch (error) {
       console.error('Login failed:', error);
     }
@@ -143,7 +161,7 @@ const Login = () => {
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
-                      type={showPassword ? "text" : "password"} // Toggle input type
+                      type={showPassword ? "text" : "password"}
                       placeholder="Password"
                       className={`w-full pl-12 pr-12 py-3 bg-white/5 border ${
                         errors.password ? "border-red-500" : "border-white/20"
@@ -191,11 +209,20 @@ const Login = () => {
                 >
                   <Button
                     type="submit"
-                    disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 text-lg font-semibold group"
+                    disabled={isLoggingIn || isRedirecting}
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 text-lg font-semibold group disabled:opacity-50"
                   >
-                    {isLoading ? "Logging in..." : "Login"}
-                    <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    {isLoggingIn || isRedirecting ? (
+                      <>
+                        <Loader2 className="mr-2 w-5 h-5 animate-spin" />
+                        {isRedirecting ? "Redirecting..." : "Logging in..."}
+                      </>
+                    ) : (
+                      <>
+                        Login
+                        <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                      </>
+                    )}
                   </Button>
                 </motion.div>
               </form>

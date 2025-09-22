@@ -10,12 +10,12 @@ const VerifyEmailContent = () => {
   const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [otp, setOtp] = useState("")
-  
-  const { 
-    verifyEmail, 
-    resendVerification, 
-    isLoading, 
-    error, 
+
+  const {
+    verifyEmail,
+    resendVerification,
+    isLoading,
+    error,
     verificationSuccess,
     clearError,
     clearVerificationSuccess,
@@ -34,7 +34,7 @@ const VerifyEmailContent = () => {
         router.push("/auth/login")
       }
     }
-    
+
     // Clear any previous states when component mounts
     clearError()
     clearVerificationSuccess()
@@ -54,7 +54,7 @@ const VerifyEmailContent = () => {
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
     if (otp.length !== 6) return
-    
+
     try {
       await verifyEmail(otp)
       // Success is handled by the useEffect above
@@ -66,7 +66,7 @@ const VerifyEmailContent = () => {
 
   const handleResend = async () => {
     if (!email) return
-    
+
     try {
       await resendVerification(email)
       // Success message is handled by the store if needed
