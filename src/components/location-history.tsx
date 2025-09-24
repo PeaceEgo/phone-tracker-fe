@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, TrendingUp, Calendar, Smartphone, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { MapPin, TrendingUp, Calendar, Smartphone, RefreshCw, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import { fetchWithAutoRefresh } from "@/lib/api";
 import { useDeviceSocket } from "@/hooks/use-device-sockets";
 
@@ -43,6 +43,7 @@ interface LocationHistoryEntry {
 
 export default function LocationHistory() {
   const [device, setDevice] = useState<Device | null>(null);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [locationData, setLocationData] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,14 +53,15 @@ export default function LocationHistory() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
- const { } = useDeviceSocket(
-  device ? [device.deviceId] : [],
-  {
-    enableTracking: true,
-    updateInterval: 30000,
-    highAccuracy: true
-  }
-);
+  const { } = useDeviceSocket(
+    device ? [device.deviceId] : [],
+    {
+      enableTracking: true,
+      updateInterval: 30000,
+      highAccuracy: true
+    }
+  );
+
   const paginationData = useMemo(() => {
     const totalItems = locationData.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -89,47 +91,68 @@ export default function LocationHistory() {
       const devicesResponse = await fetchWithAutoRefresh(
         `${process.env.NEXT_PUBLIC_API_URL}/devices/user-devices`
       );
+      
+      if (!devicesResponse.ok) {
+        throw new Error(`Failed to fetch devices: ${devicesResponse.statusText}`);
+      }
+      
       const devicesData = await devicesResponse.json();
-      const devices: Device[] = devicesData.devices;
+      const devices: Device[] = devicesData.devices || [];
 
       if (devices.length === 0) {
-        setError("No devices found");
+        setDevices([]);
+        setDevice(null);
+        setLocationData([]);
+        setError(null);
         setLoading(false);
         setRefreshing(false);
         return;
       }
 
+      setDevices(devices);
       const selectedDevice = devices[0];
       setDevice(selectedDevice);
-      const historyResponse = await fetchWithAutoRefresh(
-        `${process.env.NEXT_PUBLIC_API_URL}/locations/history/${selectedDevice.deviceId}`
-      );
-      const historyData = await historyResponse.json();
 
-      const locationArray = Array.isArray(historyData) ? historyData : historyData.history || historyData.locations || [];
+      // Only fetch location history if we have a device
+      try {
+        const historyResponse = await fetchWithAutoRefresh(
+          `${process.env.NEXT_PUBLIC_API_URL}/locations/history/${selectedDevice.deviceId}`
+        );
+        
+        if (!historyResponse.ok) {
+          // If history endpoint fails, set empty location data but don't throw
+          console.warn("Failed to fetch location history, using empty data");
+          setLocationData([]);
+        } else {
+          const historyData = await historyResponse.json();
+          const locationArray = Array.isArray(historyData) ? historyData : historyData.history || historyData.locations || [];
 
-      // Fix: Use proper type instead of 'any'
-      const history: Location[] = locationArray.map((entry: LocationHistoryEntry) => ({
-        id: entry._id,
-        device: selectedDevice.name,
-        location: entry.locationName || "Unknown",
-        address: entry.locationName || "Unknown",
-        coordinates: {
-          lat: entry.location.coordinates[1],
-          lng: entry.location.coordinates[0],
-        },
-        timestamp: new Date(entry.recordedAt || entry.timestamp || Date.now()).toLocaleString(),
-        accuracy: entry.accuracy ? `${entry.accuracy}m` : "Unknown",
-        battery: entry.batteryLevel || 100,
-        duration: entry.duration || "Unknown",
-        activity: entry.activity || "Unknown",
-      }));
-    
-      setLocationData(history);
+          const history: Location[] = locationArray.map((entry: LocationHistoryEntry) => ({
+            id: entry._id,
+            device: selectedDevice.name,
+            location: entry.locationName || "Unknown",
+            address: entry.locationName || "Unknown",
+            coordinates: {
+              lat: entry.location?.coordinates[1] || 0,
+              lng: entry.location?.coordinates[0] || 0,
+            },
+            timestamp: new Date(entry.recordedAt || entry.timestamp || Date.now()).toLocaleString(),
+            accuracy: entry.accuracy ? `${entry.accuracy}m` : "Unknown",
+            battery: entry.batteryLevel || 100,
+            duration: entry.duration || "Unknown",
+            activity: entry.activity || "Unknown",
+          }));
+        
+          setLocationData(history);
+        }
+      } catch (historyError) {
+        console.warn("Error fetching location history:", historyError);
+        setLocationData([]);
+      }
+
       setError(null);
       setCurrentPage(1);
     } catch (err: unknown) {
-      // Fix: Proper error type handling
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch data";
       setError(errorMessage);
     } finally {
@@ -210,7 +233,6 @@ export default function LocationHistory() {
     const { totalPages } = paginationData;
     
     if (totalPages <= 5) {
-      // Show all pages if 7 or fewer
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
@@ -227,6 +249,19 @@ export default function LocationHistory() {
     return pages;
   };
 
+  // No devices state - similar to RealTimeTracking
+  if (devices.length === 0 && !loading && !error) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <MapPin className="h-16 w-16 text-gray-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">No Devices Found</h2>
+          <p className="text-gray-400">Register some devices to view location history</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -242,12 +277,12 @@ export default function LocationHistory() {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
-          <div className="text-red-400 text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-red-400 mb-2">Error</h2>
-          <p className="text-gray-300 mb-4">{error}</p>
+          <AlertCircle className="h-16 w-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Error</h2>
+          <p className="text-gray-400 mb-4">{error}</p>
           <button
             onClick={() => fetchData()}
-            className="bg-blue-500 hover:bg-blue-600 px-6 py-3 rounded-lg text-white font-medium transition-colors"
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
           >
             Try Again
           </button>
@@ -410,7 +445,7 @@ export default function LocationHistory() {
                 <div className="text-center py-12">
                   <MapPin className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-400 text-xl">No location history found</p>
-                  <p className="text-gray-500">Location data will appear here once available</p>
+                  <p className="text-gray-500">Location data will appear here once tracking starts</p>
                 </div>
               ) : (
                 <>
