@@ -21,6 +21,33 @@ interface NavigatorWithBattery extends Navigator {
   getBattery: () => Promise<BatteryManager>;
 }
 
+// Define proper types for socket event payloads
+interface LocationUpdatePayload {
+  deviceId: string;
+  location: {
+    latitude?: number;
+    longitude?: number;
+    type?: string;
+    coordinates?: [number, number];
+    accuracy?: number;
+    speed?: number | null;
+    heading?: number | null;
+  };
+  updatedAt?: string;
+}
+
+// Type for the location format expected by the store
+interface StoreLocationFormat {
+  type: string;
+  coordinates: [number, number];
+}
+
+interface LocationSavedPayload {
+  deviceId: string;
+  success: boolean;
+  timestamp?: string;
+}
+
 // Extended Socket interface with our custom properties
 interface CustomSocket extends Socket {
   isUpdatingLocation?: boolean;
@@ -49,6 +76,9 @@ export function useDeviceSocket(
     maxAge = 60000, 
     timeout = 10000 
   } = options;
+
+  // Create a stable deviceIds string for dependency array
+  const deviceIdsString = deviceIds.join(',');
 
   // Stable sendCurrentLocation with debouncing
   const sendCurrentLocation = useCallback((socket: CustomSocket, deviceId: string, force = false) => {
@@ -206,21 +236,43 @@ export function useDeviceSocket(
             if (socket.connected) {
               sendCurrentLocation(socket, id, true);
             }
-          }, Math.random() * 2000); // Random delay between 0-2 seconds
+          }, Math.random() * 10000); 
         });
       }
     };
 
-    const handleLocationUpdate = (payload: any) => {
+    const handleLocationUpdate = (payload: LocationUpdatePayload) => {
       console.log("📡 Location update received:", payload.deviceId);
+      
+      // Convert location to GeoJSON format if needed
+      let location: StoreLocationFormat;
+      
+      if (payload.location.type && payload.location.coordinates) {
+        // Already in GeoJSON format
+        location = {
+          type: payload.location.type,
+          coordinates: payload.location.coordinates
+        };
+      } else if (payload.location.latitude && payload.location.longitude) {
+        // Convert from lat/lng format to GeoJSON Point format
+        // Note: GeoJSON coordinates are [longitude, latitude] (opposite of typical lat,lng)
+        location = {
+          type: 'Point',
+          coordinates: [payload.location.longitude, payload.location.latitude]
+        };
+      } else {
+        console.error("Invalid location format received:", payload.location);
+        return;
+      }
+      
       updateDevice(payload.deviceId, {
         isOnline: true,
-        location: payload.location,
+        location: location,
         updatedAt: payload.updatedAt || new Date().toISOString(),
       });
     };
 
-    const handleLocationSaved = (payload: any) => {
+    const handleLocationSaved = (payload: LocationSavedPayload) => {
       console.log("💾 Location saved:", payload.deviceId);
     };
 
@@ -314,7 +366,7 @@ export function useDeviceSocket(
       
       setIsTracking(false);
     };
-  }, [deviceIds.join(','), enableTracking, locationPermission, updateInterval, sendCurrentLocation, updateDevice]);
+  }, [deviceIdsString, enableTracking, locationPermission, updateInterval, sendCurrentLocation, updateDevice]);
 
   // Manual location update with debouncing
   const sendLocationUpdate = useCallback((deviceId: string, force = false) => {
