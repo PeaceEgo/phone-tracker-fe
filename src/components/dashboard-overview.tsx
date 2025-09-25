@@ -230,7 +230,7 @@ export function DashboardOverview() {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
         >
-          <div className="text-center sm:text-left">
+          <div className="text-center sm:text-left ">
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-blue-200 to-blue-400 bg-clip-text text-transparent mb-2 sm:mb-3">
               Dashboard Overview
             </h1>
@@ -378,7 +378,7 @@ export function DashboardOverview() {
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button 
                     onClick={openRegisterModal}
-                    className="w-full p-3 sm:p-4 h-auto bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white transition-all duration-300 group"
+                    className="w-full p-3 sm:p-4 h-auto bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white transition-all duration-300 group cursor-pointer"
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="text-left">
@@ -393,8 +393,8 @@ export function DashboardOverview() {
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
                     onClick={openHistoryModal}
-                    variant="outline"
-                    className="w-full p-3 sm:p-4 h-auto border-white/20 text-white hover:bg-white/10 bg-transparent transition-all duration-300 group"
+                    // variant="outline"
+                    className="w-full p-3 sm:p-4 h-auto text-white hover:bg-blue-500/20 hover:border-blue-400/40 hover:text-blue-100 transition-all duration-300 group cursor-pointer"
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="text-left">

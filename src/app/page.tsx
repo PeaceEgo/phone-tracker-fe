@@ -156,7 +156,7 @@ export default function LandingPage() {
             >
               <Button
                 size="lg"
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 text-lg group"
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-4 text-lg group cursor-pointer"
                 onClick={handleSignUp}
               >
                 Start Today!
@@ -166,7 +166,7 @@ export default function LandingPage() {
               <Button
                 variant="outline"
                 size="lg"
-                className="border-white/30 text-white hover:bg-white/10 px-8 py-4 text-lg group bg-transparent"
+                className="border-white/30 text-white hover:bg-blue-500/20 hover:border-blue-400/40 hover:text-blue-100 px-8 py-4 text-lg group bg-white/5 cursor-pointer transition-all duration-300"
               >
                 <Play className="mr-2 w-5 h-5 group-hover:scale-110 transition-transform" />
                 Watch Demo
