@@ -44,7 +44,7 @@ export default function Header({ variant = "landing", showNavLinks = true }: Hea
         <div className="flex justify-between items-center py-4">
           {/* Logo */}
           <motion.div className="flex items-center space-x-2" whileHover={{ scale: 1.05 }}>
-            <Link href="/" className="flex items-center space-x-2">
+            <Link href="/" className="flex items-center space-x-2 cursor-pointer">
               <Smartphone className="w-8 h-8 text-blue-400" />
               <span className="text-xl font-bold bg-gradient-to-r from-white to-blue-400 bg-clip-text text-transparent">
                 TrackGuard
