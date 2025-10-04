@@ -1,3 +1,4 @@
+// store/devices.ts
 import { create } from "zustand";
 import { useAuthStore } from "./auth";
 import { fetchWithAutoRefresh } from "@/lib/api";
@@ -20,7 +21,6 @@ export interface Device {
   updatedAt?: string;
 }
 
-// Update the LocationHistoryResponse interface in your devices store
 interface LocationHistoryResponse {
   history: Array<{
     _id: string;
@@ -33,7 +33,6 @@ interface LocationHistoryResponse {
     accuracy?: string;
     battery?: number;
     activity?: string;
-    // Additional fields that might be present
     speed?: number;
     heading?: number;
     address?: string;
@@ -44,7 +43,6 @@ interface LocationHistoryResponse {
   timePeriod?: string;
 }
 
-// Add interfaces for other API responses
 interface DistanceCoveredResponse {
   distance: number;
   unit: string;
@@ -76,7 +74,6 @@ interface LocationStatsResponse {
   timePeriod: string;
   deviceId?: string;
   deviceName?: string;
-  // Additional stats fields
   maxSpeed?: number;
   avgSpeed?: number;
   totalDistance?: number;
@@ -101,8 +98,8 @@ interface DevicesState {
   fetchLocationStats: (deviceId: string, days?: number) => Promise<LocationStatsResponse>;
 }
 
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-const MIN_FETCH_INTERVAL = 2000; // Minimum 2 seconds between fetches
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache
+const MIN_FETCH_INTERVAL = 30000; // 30 seconds minimum between API calls
 
 export const useDevicesStore = create<DevicesState>((set, get) => ({
   devices: [],
@@ -121,7 +118,7 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
       return state.fetchPromise;
     }
     
-    // Check minimum interval between fetches
+    // Check minimum interval between fetches (prevent rapid successive calls)
     if (!forceRefresh && (now - state.lastFetchTime) < MIN_FETCH_INTERVAL) {
       console.log('📱 Too soon to fetch devices again, skipping...');
       return Promise.resolve();
@@ -133,7 +130,7 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
       return Promise.resolve();
     }
 
-    // Check cache first (unless force refresh)
+    // Check cache first (unless force refresh) - 10 minute TTL
     if (!forceRefresh) {
       const cacheKey = `user_devices_cache_${userId}`;
       const cached = localStorage.getItem(cacheKey);
@@ -142,9 +139,11 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
         try {
           const { devices, timestamp } = JSON.parse(cached);
           if (now - timestamp < CACHE_TTL) {
-            console.log('📱 Using cached devices');
+            console.log('📱 Using cached devices (10min cache)');
             set({ devices, lastFetchTime: now });
             return Promise.resolve();
+          } else {
+            console.log('📱 Cache expired, fetching fresh data');
           }
         } catch (e) {
           console.warn('Failed to parse device cache:', e);
@@ -184,7 +183,7 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
           fetchPromise: null
         });
 
-        // Update cache
+        // Update cache with 10-minute TTL
         const cacheKey = `user_devices_cache_${userId}`;
         localStorage.setItem(cacheKey, JSON.stringify({
           devices,
@@ -207,7 +206,8 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
   },
 
   addDevice: (device) => {
-    const updated = [...get().devices, device];
+    const state = get();
+    const updated = [...state.devices, device];
     set({ devices: updated });
 
     const userId = useAuthStore.getState().user?.id;
@@ -220,7 +220,8 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
   },
 
   updateDevice: (deviceId, updates) => {
-    const updated = get().devices.map((d) =>
+    const state = get();
+    const updated = state.devices.map((d) =>
       d.deviceId === deviceId ? { ...d, ...updates } : d
     );
     set({ devices: updated });
@@ -235,7 +236,8 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
   },
 
   removeDevice: async (deviceId) => {
-    const prevDevices = get().devices;
+    const state = get();
+    const prevDevices = state.devices;
     const updated = prevDevices.filter((d) => d.deviceId !== deviceId);
     set({ devices: updated });
 
