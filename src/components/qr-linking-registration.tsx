@@ -62,7 +62,7 @@ export function QRCodeRegistration({ onDeviceRegistered }: QRCodeRegistrationPro
         type: deviceType,
       }
 
-      const response = await fetch("https://phone-tracker-be.onrender.com/api/devices/generate-qr", {
+      const response = await fetch("https://phone-tracker-be-mqpm.vercel.app/api/devices/generate-qr", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

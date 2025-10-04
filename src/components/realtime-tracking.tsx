@@ -88,7 +88,7 @@ export function RealTimeTracking() {
 
   // Configuration
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
-  const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://phone-tracker-be.onrender.com"
+  const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://phone-tracker-be-mqpm.vercel.app"
   
   // Connection settings
   const MAX_RETRIES = 5

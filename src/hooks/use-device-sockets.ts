@@ -300,7 +300,7 @@ export function useDeviceSocket(
 
     console.log("🔄 Setting up socket for devices:", currentDeviceIds);
 
-    const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://phone-tracker-be.onrender.com";
+    const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://phone-tracker-be-mqpm.vercel.app";
 
     // Use global socket or create new one
     let socket: CustomSocket;
