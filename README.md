@@ -23,9 +23,10 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Variable | Purpose |
 |----------|---------|
-| `NEXT_PUBLIC_API_URL` | Backend REST base (e.g. `https://host/api`) |
+| `NEXT_PUBLIC_API_URL` | Same-origin API base — use `/backend/api` (proxied) |
 | `NEXT_PUBLIC_WS_URL` | Socket.IO origin (e.g. `wss://host`) |
 | `NEXT_PUBLIC_APP_URL` | Public HTTPS FE origin for QR links (match backend `PUBLIC_APP_URL`) |
+| `BACKEND_URL` | Upstream API origin for Next rewrites (server-only) |
 
 The backend must allow credentials (cookies) from your frontend origin.
 

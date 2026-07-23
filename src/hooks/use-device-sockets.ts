@@ -300,47 +300,25 @@ export function useDeviceSocket(
 
     console.log("🔄 Setting up socket for devices:", currentDeviceIds);
 
-    const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://phone-tracker-be.onrender.com"; 
-
-    // Use global socket or create new one
-    let socket: CustomSocket;
-    if (globalSocket && (globalSocket.connected || globalSocket.active)) {
-      console.log("🔗 Reusing existing global socket connection");
-      socket = globalSocket;
-    } else {
-      console.log("🔌 Creating new socket connection");
-      socket = io(WS_URL, {
-        withCredentials: true,
-        transports: ["websocket", "polling"],
-        reconnection: true,
-        reconnectionAttempts: 3,
-        reconnectionDelay: 2000,
-        timeout: 15000,
-        autoConnect: false,
-      }) as CustomSocket;
-      globalSocket = socket;
-    }
-
-    connectionCount++;
-    console.log(`🔢 Active connections: ${connectionCount}`);
+    const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://phone-tracker-be.onrender.com";
+    let cancelled = false;
+    let socket: CustomSocket | null = null;
 
     const handleConnect = () => {
+      if (!socket) return;
       console.log("✅ Socket connected, watching devices:", currentDeviceIds);
-      
-      // Watch all devices
+
       currentDeviceIds.forEach((id) => {
         console.log("👀 Watching device:", id);
-        socket.emit("watchDevice", { deviceId: id });
+        socket!.emit("watchDevice", { deviceId: id });
       });
 
-      // Send initial location if tracking is enabled
-      if (enableTracking && locationPermission === 'granted') {
+      if (enableTracking && locationPermission === "granted") {
         console.log("🚀 Sending initial location updates");
         currentDeviceIds.forEach((id, index) => {
-          // Stagger initial location updates to prevent flooding
           setTimeout(() => {
-            if (socket.connected) {
-              sendCurrentLocation(socket, id, true); // Force initial update
+            if (socket?.connected) {
+              sendCurrentLocation(socket, id, true);
             }
           }, index * 2000);
         });
@@ -349,25 +327,24 @@ export function useDeviceSocket(
 
     const handleLocationUpdate = (payload: LocationUpdatePayload) => {
       console.log("📡 Location update received:", payload.deviceId);
-      
-      // Convert location to GeoJSON format
+
       let location: StoreLocationFormat;
-      
+
       if (payload.location.type && payload.location.coordinates) {
         location = {
           type: payload.location.type,
-          coordinates: payload.location.coordinates
+          coordinates: payload.location.coordinates,
         };
       } else if (payload.location.latitude && payload.location.longitude) {
         location = {
-          type: 'Point',
-          coordinates: [payload.location.longitude, payload.location.latitude]
+          type: "Point",
+          coordinates: [payload.location.longitude, payload.location.latitude],
         };
       } else {
         console.error("Invalid location format received:", payload.location);
         return;
       }
-      
+
       updateDevice(payload.deviceId, {
         isOnline: true,
         location: location,
@@ -386,12 +363,11 @@ export function useDeviceSocket(
 
     const handleReconnect = (attemptNumber: number) => {
       console.log("🔁 Socket reconnected, attempt:", attemptNumber);
-      
-      // Re-watch devices after reconnection
+
       setTimeout(() => {
-        if (socket.connected) {
+        if (socket?.connected) {
           currentDeviceIds.forEach((id) => {
-            socket.emit("watchDevice", { deviceId: id });
+            socket!.emit("watchDevice", { deviceId: id });
           });
         }
       }, 1000);
@@ -401,74 +377,100 @@ export function useDeviceSocket(
       console.error("🔌 Socket connection error:", error);
     };
 
-    // Add event listeners
-    socket.on("connect", handleConnect);
-    socket.on("locationUpdate", handleLocationUpdate);
-    socket.on("locationSaved", handleLocationSaved);
-    socket.on("disconnect", handleDisconnect);
-    socket.on("reconnect", handleReconnect);
-    socket.on("connect_error", handleConnectError);
+    const setup = async () => {
+      if (globalSocket && (globalSocket.connected || globalSocket.active)) {
+        console.log("🔗 Reusing existing global socket connection");
+        socket = globalSocket;
+      } else {
+        console.log("🔌 Creating new socket connection");
+        const { getSocketAuthToken } = await import("@/lib/socket-auth");
+        if (cancelled) return;
+        const token = await getSocketAuthToken();
+        if (cancelled) return;
 
-    socketRef.current = socket;
-
-    // Connect if not already connected
-    if (!socket.connected && !socket.active) {
-      console.log("🔗 Connecting socket...");
-      socket.connect();
-    }
-
-    // Set up periodic location updates only if tracking is enabled
-    if (enableTracking && locationPermission === 'granted') {
-      console.log("🔄 Starting periodic location tracking");
-      setIsTracking(true);
-      
-      // Clear existing interval first
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+        socket = io(WS_URL, {
+          withCredentials: true,
+          auth: token ? { token } : undefined,
+          transports: ["websocket", "polling"],
+          reconnection: true,
+          reconnectionAttempts: 3,
+          reconnectionDelay: 2000,
+          timeout: 15000,
+          autoConnect: false,
+        }) as CustomSocket;
+        globalSocket = socket;
       }
-      
-      // Set new interval with proper cleanup
-      intervalRef.current = setInterval(() => {
-        if (socket.connected) {
-          currentDeviceIds.forEach((deviceId) => {
-            sendCurrentLocation(socket, deviceId);
-          });
+
+      if (cancelled || !socket) return;
+
+      connectionCount++;
+      console.log(`🔢 Active connections: ${connectionCount}`);
+
+      socket.on("connect", handleConnect);
+      socket.on("locationUpdate", handleLocationUpdate);
+      socket.on("locationSaved", handleLocationSaved);
+      socket.on("disconnect", handleDisconnect);
+      socket.on("reconnect", handleReconnect);
+      socket.on("connect_error", handleConnectError);
+
+      socketRef.current = socket;
+
+      if (!socket.connected && !socket.active) {
+        console.log("🔗 Connecting socket...");
+        socket.connect();
+      }
+
+      if (enableTracking && locationPermission === "granted") {
+        console.log("🔄 Starting periodic location tracking");
+        setIsTracking(true);
+
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
         }
-      }, updateInterval);
-    }
 
-    // Cleanup function
+        intervalRef.current = setInterval(() => {
+          const active = socket;
+          if (active?.connected) {
+            currentDeviceIds.forEach((deviceId) => {
+              sendCurrentLocation(active, deviceId);
+            });
+          }
+        }, updateInterval);
+      }
+    };
+
+    void setup();
+
     return () => {
+      cancelled = true;
       console.log("🧹 Cleaning up socket effect");
-      
-      connectionCount--;
+
+      connectionCount = Math.max(0, connectionCount - 1);
       console.log(`🔢 Remaining connections: ${connectionCount}`);
-      
-      // Remove event listeners
-      socket.off("connect", handleConnect);
-      socket.off("locationUpdate", handleLocationUpdate);
-      socket.off("locationSaved", handleLocationSaved);
-      socket.off("disconnect", handleDisconnect);
-      socket.off("reconnect", handleReconnect);
-      socket.off("connect_error", handleConnectError);
-      
-      // Clear interval
+
+      if (socket) {
+        socket.off("connect", handleConnect);
+        socket.off("locationUpdate", handleLocationUpdate);
+        socket.off("locationSaved", handleLocationSaved);
+        socket.off("disconnect", handleDisconnect);
+        socket.off("reconnect", handleReconnect);
+        socket.off("connect_error", handleConnectError);
+      }
+
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-      
-      // Reset update flag
+
       isUpdatingRef.current = false;
-      
-      // Only disconnect if no components are using the socket
+
       if (connectionCount === 0 && globalSocket) {
         console.log("🔌 Disconnecting global socket (no active connections)");
         globalSocket.disconnect();
         globalSocket = null;
       }
-      
+
       setIsTracking(false);
     };
   }, [enableTracking, locationPermission, updateInterval, sendCurrentLocation, updateDevice]);

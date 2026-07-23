@@ -246,6 +246,9 @@ export function RealTimeTracking() {
       console.log(`🚀 Attempting to connect to WebSocket: ${WS_URL}`)
       console.log(`📱 Device IDs to watch: ${deviceIds.join(', ')}`)
 
+      const { getSocketAuthToken } = await import("@/lib/socket-auth")
+      const token = await getSocketAuthToken()
+
       // Create socket with optimized configuration
       const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(WS_URL, {
         timeout: CONNECTION_TIMEOUT,
@@ -257,6 +260,7 @@ export function RealTimeTracking() {
         forceNew: true,
         autoConnect: true,
         withCredentials: true,
+        auth: token ? { token } : undefined,
         upgrade: true,
         rememberUpgrade: false,
         transports: ['websocket', 'polling'], 
