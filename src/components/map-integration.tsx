@@ -104,21 +104,34 @@ export function TrackingMap({
     })
   }, [])
 
-  // Create popup content - stable function
+  // Create popup content - escape user-controlled strings to avoid XSS
   const createPopupContent = useCallback((device: Device, lat: number, lng: number, lastUpdate: string) => {
+    const escapeHtml = (value: string) =>
+      value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
+
+    const name = escapeHtml(device.name || "Unknown device")
+    const location = escapeHtml(device.locationName || device.location || "Unknown location")
+    const status = escapeHtml(device.status || "offline")
+    const safeLastUpdate = escapeHtml(lastUpdate)
+
     return `
       <div style="min-width: 200px; font-family: system-ui;">
         <div style="font-weight: 600; color: #1f2937; margin-bottom: 8px; font-size: 14px;">
-          ${device.name}
+          ${name}
         </div>
         <div style="color: #6b7280; font-size: 12px; margin-bottom: 12px;">
-          ${device.locationName || device.location}
+          ${location}
         </div>
         <div style="display: grid; gap: 8px; font-size: 12px;">
           <div style="display: flex; justify-content: space-between;">
             <span style="font-weight: 500;">Status:</span>
             <span style="color: ${device.status === 'online' ? '#059669' : '#6b7280'};">
-              ${device.status.toUpperCase()}
+              ${status.toUpperCase()}
             </span>
           </div>
           <div style="display: flex; justify-content: space-between;">
@@ -127,7 +140,7 @@ export function TrackingMap({
           </div>
           <div style="display: flex; justify-content: space-between;">
             <span style="font-weight: 500;">Last update:</span>
-            <span style="color: ${device.status === 'online' ? '#059669' : '#6b7280'};">${lastUpdate}</span>
+            <span style="color: ${device.status === 'online' ? '#059669' : '#6b7280'};">${safeLastUpdate}</span>
           </div>
         </div>
       </div>

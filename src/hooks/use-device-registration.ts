@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
 import { useDevicesStore } from '@/store/devices';
+import { fetchWithAutoRefresh } from '@/lib/api';
 
 const generateDeviceFingerprint = (): string => {
   try {
@@ -158,15 +159,11 @@ export const useDeviceRegistration = () => {
       console.log('Registering device with fingerprint:', deviceFingerprint);
       console.log('Device data:', deviceData);
 
-      const response = await fetch(
+      const response = await fetchWithAutoRefresh(
         `${process.env.NEXT_PUBLIC_API_URL}/devices/register`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify(deviceData)
+          body: JSON.stringify(deviceData),
         }
       );
 

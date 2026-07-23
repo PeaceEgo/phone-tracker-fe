@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/components/auth-provider";
-
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TrackGuard - Secure Phone Tracking",
-  description: "TrackGuard is a secure phone tracking application designed to help you locate your lost or stolen devices while prioritizing your privacy and data security.",
+  title: "TrackGuard - Device Location Tracker",
+  description:
+    "TrackGuard helps you register devices, view location history, and follow live GPS updates over WebSockets.",
   icons: {
     icon: [
       { url: "/favicon.ico", type: "image/x-icon" },
@@ -25,7 +26,6 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
     shortcut: "/favicon-16x16.png",
-
   },
 };
 
@@ -35,12 +35,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
       >
         <AuthProvider>
           {children}
+          <Toaster />
         </AuthProvider>
       </body>
     </html>

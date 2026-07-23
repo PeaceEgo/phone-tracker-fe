@@ -1,26 +1,35 @@
-"use client"
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/auth'
-import { Loader2 } from 'lucide-react'
+"use client";
 
-export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const { isAuthenticated, isLoading } = useAuthStore()
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/auth";
+import { Loader2 } from "lucide-react";
+
+export default function ProtectedRoute({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const router = useRouter();
+  const { isAuthenticated, isInitialized, isLoading } = useAuthStore();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/auth/login')
+    if (isInitialized && !isLoading && !isAuthenticated) {
+      router.replace("/auth/login");
     }
-  }, [isAuthenticated, isLoading, router])
+  }, [isAuthenticated, isInitialized, isLoading, router]);
 
-  if (isLoading) {
+  if (!isInitialized || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-black">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" aria-label="Loading" />
       </div>
-    )
+    );
   }
 
-  return isAuthenticated ? <>{children}</> : null
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return <>{children}</>;
 }

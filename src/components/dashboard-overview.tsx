@@ -46,8 +46,8 @@ export function DashboardOverview() {
   // Extract device IDs for socket connection
   const deviceIds = devices.map(device => device.deviceId);
   
-  // Initialize socket connection for real-time updates
-  useDeviceSocket(deviceIds);
+  // Listen for live updates only — do not emit browser GPS as device location
+  useDeviceSocket(deviceIds, { enableTracking: false });
 
   useEffect(() => {
     setIsClient(true);
@@ -60,43 +60,46 @@ export function DashboardOverview() {
     setPositions(newPositions);
   }, []);
 
-  // Initial data fetch and location history processing
+  // Load devices once, then history from store snapshot (avoids devices-deps refetch loop)
   useEffect(() => {
     const loadDevicesAndLocationData = async () => {
-      // Fetch devices from store
       await fetchDevices();
-      
-      // If we have devices, fetch additional location data
-      if (devices.length > 0) {
-        let totalTodayLocations = 0;
-        
-        for (const device of devices) {
-          try {
-            const historyData = await fetchLocationHistory(device.deviceId);
-            const history: LocationHistoryEntry[] = historyData.history || [];
 
-            // Count today's locations
-            const today = new Date().toDateString();
-            const todayCount = history.filter(entry => 
-              new Date(entry.timestamp).toDateString() === today
-            ).length;
-            totalTodayLocations += todayCount;
-
-            // Update online status based on latest history entry
-            if (history.length > 0) {
-              updateOnlineStatusFromHistory(device.deviceId, history[0].timestamp);
-            }
-          } catch (err) {
-            console.error(`Failed to fetch location history for device ${device.deviceId}:`, err);
-          }
-        }
-        
-        setTodayLocations(totalTodayLocations);
+      const currentDevices = useDevicesStore.getState().devices;
+      if (currentDevices.length === 0) {
+        setTodayLocations(0);
+        return;
       }
+
+      let totalTodayLocations = 0;
+
+      for (const device of currentDevices) {
+        try {
+          const historyData = await fetchLocationHistory(device.deviceId);
+          const history: LocationHistoryEntry[] = historyData.history || [];
+
+          const today = new Date().toDateString();
+          const todayCount = history.filter(
+            (entry) => new Date(entry.timestamp).toDateString() === today
+          ).length;
+          totalTodayLocations += todayCount;
+
+          if (history.length > 0) {
+            updateOnlineStatusFromHistory(device.deviceId, history[0].timestamp);
+          }
+        } catch (err) {
+          console.error(
+            `Failed to fetch location history for device ${device.deviceId}:`,
+            err
+          );
+        }
+      }
+
+      setTodayLocations(totalTodayLocations);
     };
 
-    loadDevicesAndLocationData();
-  }, [fetchDevices, devices, fetchLocationHistory, updateOnlineStatusFromHistory]);
+    void loadDevicesAndLocationData();
+  }, [fetchDevices, fetchLocationHistory, updateOnlineStatusFromHistory]);
 
   // Refresh handler using store method
   const handleRefresh = async () => {

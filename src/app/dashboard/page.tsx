@@ -1,16 +1,12 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DashboardOverview } from "@/components/dashboard-overview";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { RealTimeTracking } from "@/components/realtime-tracking";
 import { DashboardSidebar } from "@/components/sidebar";
 import { DeviceRegistration } from "@/components/device-registration";
 import LocationHistory from "@/components/location-history";
-;
-
-
-
 
 interface Position {
   left: string;
@@ -19,7 +15,7 @@ interface Position {
   delay: number;
 }
 
-export default function Dashboard() {
+export default function DashboardPage() {
   const [activeSection, setActiveSection] = useState("overview");
   const [positions, setPositions] = useState<Position[]>([]);
 
@@ -38,8 +34,6 @@ export default function Dashboard() {
     registration: "Device Registration",
     history: "Location History",
     tracking: "Real-time Tracking",
-    notifications: "Notification Settings",
-    settings: "Settings Panel",
   };
 
   const renderContent = () => {
@@ -48,19 +42,17 @@ export default function Dashboard() {
       registration: <DeviceRegistration />,
       history: <LocationHistory />,
       tracking: <RealTimeTracking />,
-      // notifications: <NotificationSettings />,
-      // settings: <SettingsPanel />,
     };
 
-    return components[activeSection as keyof typeof components] || <DashboardOverview />;
+    return (
+      components[activeSection as keyof typeof components] || <DashboardOverview />
+    );
   };
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden">
-      {/* Animated Background */}
+    <div className="min-h-screen bg-black text-white">
       <div className="fixed inset-0 bg-gradient-to-br from-blue-900/10 via-purple-900/10 to-black -z-10" />
 
-      {/* Floating Elements */}
       <div className="fixed inset-0 pointer-events-none -z-10">
         {positions.map((pos, i) => (
           <motion.div
@@ -83,18 +75,20 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <SidebarProvider defaultOpen={true}>
-        <DashboardSidebar activeSection={activeSection} setActiveSection={setActiveSection} />
+      <div className="flex h-screen">
+        <DashboardSidebar
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
+        />
 
-        <SidebarInset className="relative bg-black">
-          {/* Header */}
+        <div className="flex-1 flex flex-col min-w-0">
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="sticky top-0 z-40 bg-black/90 backdrop-blur-md border-b border-white/10"
+            className="hidden md:block sticky top-0 z-30 bg-black/90 backdrop-blur-md border-b border-white/10"
           >
             <div className="flex items-center justify-between p-6">
-              <div>
+              <div className="flex-1 min-w-0">
                 <motion.h1
                   className="text-2xl font-bold bg-gradient-to-r from-white to-blue-400 bg-clip-text text-transparent"
                   key={activeSection}
@@ -110,49 +104,33 @@ export default function Dashboard() {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.1 }}
                 >
-                  Manage your tracking dashboard
+                  Manage your devices and location data
                 </motion.p>
               </div>
-
-              {/* Quick Actions */}
-              <motion.div
-                className="flex items-center space-x-3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                </div>
-                <span className="text-sm text-gray-400">System Online</span>
-              </motion.div>
             </div>
           </motion.div>
 
-          {/* Main Content */}
-          <main className="relative min-h-screen bg-black">
-            <div className="p-6">
-              <div className="max-w-7xl mx-auto">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeSection}
-                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                    transition={{
-                      duration: 0.3,
-                      ease: "easeInOut",
-                    }}
-                    className="relative z-10"
-                  >
-                    {renderContent()}
-                  </motion.div>
-                </AnimatePresence>
-              </div>
+          <main className="flex-1 overflow-auto bg-black">
+            <div className="p-4 md:p-6 mt-6 md:mt-8">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeSection}
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                  transition={{
+                    duration: 0.3,
+                    ease: "easeInOut",
+                  }}
+                  className="max-w-7xl mx-auto"
+                >
+                  {renderContent()}
+                </motion.div>
+              </AnimatePresence>
             </div>
           </main>
-        </SidebarInset>
-      </SidebarProvider>
+        </div>
+      </div>
     </div>
   );
 }

@@ -83,31 +83,44 @@ export const useAuthStore = create<AuthState>()(
 
 initializeAuth: async () => {
   const state = get()
-  if (state.isInitialized) return
+  if (state.isInitialized || state.isLoading) return
 
-  console.log('🚀 Initializing auth state from storage...')
+  // Already logged in this session (e.g. just finished login) — don't wipe it
+  if (state.isAuthenticated && state.user) {
+    set({ isInitialized: true, isLoading: false })
+    return
+  }
+
+  set({ isLoading: true })
 
   try {
-    // Check if there is a valid session on app load
     const user = await getCurrentUser();
     if (user) {
       set({
         user: {
           id: user.id,
-          name: user.fullName, 
+          name: user.fullName,
           email: user.email
         },
         isAuthenticated: true,
         isInitialized: true,
         isLoading: false
       });
-      console.log('✅ Re-authenticated from existing session');
     } else {
-      set({ isInitialized: true, isLoading: false });
+      set({
+        user: null,
+        isAuthenticated: false,
+        isInitialized: true,
+        isLoading: false
+      });
     }
-  } catch (error) {
-    console.error('❌ Session initialization failed:', error);
-    set({ isInitialized: true, isLoading: false });
+  } catch {
+    set({
+      user: null,
+      isAuthenticated: false,
+      isInitialized: true,
+      isLoading: false
+    });
   }
 },
       login: async (email: string, password: string) => {
@@ -230,8 +243,6 @@ initializeAuth: async () => {
       name: 'auth-storage',
       partialize: (state: AuthState) => ({
         user: state.user,
-        isAuthenticated: state.isAuthenticated,
-        isInitialized: state.isInitialized,
         verificationEmail: state.verificationEmail
       })
     }

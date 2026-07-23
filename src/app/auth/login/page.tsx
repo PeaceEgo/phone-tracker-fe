@@ -1,4 +1,5 @@
 "use client";
+import { Suspense, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,13 +7,19 @@ import { Smartphone, ArrowRight, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { LoginFormData, loginSchema } from "@/lib/validation";
-import { useEffect, useState } from "react";
 
-const Login = () => {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next");
+  const safeNext =
+    nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
+      ? nextPath
+      : "/dashboard";
+
   const { 
     login, 
     isLoading: isLoggingIn, 
@@ -20,7 +27,8 @@ const Login = () => {
     clearError, 
     needsVerification, 
     verificationEmail,
-    user
+    user,
+    isAuthenticated,
   } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
@@ -33,15 +41,20 @@ const Login = () => {
     resolver: zodResolver(loginSchema),
   });
 
-  // Redirect if already authenticated
   useEffect(() => {
-    if (user && !isRedirecting) {
+    // Only redirect on a confirmed session — NOT persisted `user` alone
+    // (user without isAuthenticated causes login ↔ link-device bounce)
+    if (isAuthenticated && !isRedirecting && !isLoggingIn) {
       setIsRedirecting(true);
-      router.push("/dashboard");
+      // Full navigation after login so mobile browsers attach cookies reliably
+      if (safeNext.startsWith("/link-device")) {
+        window.location.assign(safeNext);
+        return;
+      }
+      router.replace(safeNext);
     }
-  }, [user, router, isRedirecting]);
+  }, [isAuthenticated, router, isRedirecting, safeNext, isLoggingIn]);
 
-  // Redirect if user needs verification
   useEffect(() => {
     if (needsVerification && verificationEmail && !isRedirecting) {
       setIsRedirecting(true);
@@ -53,7 +66,6 @@ const Login = () => {
     try {
       clearError();
       await login(data.email, data.password);
-      // The redirect will be handled by the useEffect above
     } catch (error) {
       console.error('Login failed:', error);
     }
@@ -236,7 +248,7 @@ const Login = () => {
               >
                 <div className="text-center text-sm text-gray-400">
                   <p>
-                    Don &apos;t have an account yet?{" "}
+                    Don&apos;t have an account yet?{" "}
                     <Link href="/auth/signup" className="text-blue-400 hover:text-blue-300 transition-colors">
                       Sign Up
                     </Link>
@@ -245,7 +257,7 @@ const Login = () => {
 
                 <div className="text-center text-sm">
                   <Link href="/auth/forgot-password" className="text-blue-400 hover:text-blue-300 transition-colors">
-                    Forgot Password?
+                    Forgot password?
                   </Link>
                 </div>
               </motion.div>
@@ -257,4 +269,16 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default function Login() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-black flex items-center justify-center text-gray-400">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
+  );
+}

@@ -56,9 +56,7 @@ export default function LocationHistory() {
   const { } = useDeviceSocket(
     device ? [device.deviceId] : [],
     {
-      enableTracking: true,
-      updateInterval: 30000,
-      highAccuracy: true
+      enableTracking: false,
     }
   );
 
@@ -80,6 +78,47 @@ export default function LocationHistory() {
     };
   }, [locationData, currentPage, itemsPerPage]);
 
+  const fetchHistoryForDevice = async (selectedDevice: Device) => {
+    try {
+      const historyResponse = await fetchWithAutoRefresh(
+        `${process.env.NEXT_PUBLIC_API_URL}/locations/history/${selectedDevice.deviceId}`
+      );
+
+      if (!historyResponse.ok) {
+        setLocationData([]);
+        return;
+      }
+
+      const historyData = await historyResponse.json();
+      const locationArray = Array.isArray(historyData)
+        ? historyData
+        : historyData.history || historyData.locations || [];
+
+      const history: Location[] = locationArray.map((entry: LocationHistoryEntry) => ({
+        id: entry._id,
+        device: selectedDevice.name,
+        location: entry.locationName || "Unknown",
+        address: entry.locationName || "Unknown",
+        coordinates: {
+          lat: entry.location?.coordinates[1] || 0,
+          lng: entry.location?.coordinates[0] || 0,
+        },
+        timestamp: new Date(
+          entry.recordedAt || entry.timestamp || Date.now()
+        ).toLocaleString(),
+        accuracy: entry.accuracy ? `${entry.accuracy}m` : "Unknown",
+        battery: entry.batteryLevel || 100,
+        duration: entry.duration || "Unknown",
+        activity: entry.activity || "Unknown",
+      }));
+
+      setLocationData(history);
+      setCurrentPage(1);
+    } catch {
+      setLocationData([]);
+    }
+  };
+
   const fetchData = async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -97,61 +136,25 @@ export default function LocationHistory() {
       }
       
       const devicesData = await devicesResponse.json();
-      const devices: Device[] = devicesData.devices || [];
+      const nextDevices: Device[] = devicesData.devices || [];
 
-      if (devices.length === 0) {
+      if (nextDevices.length === 0) {
         setDevices([]);
         setDevice(null);
         setLocationData([]);
         setError(null);
-        setLoading(false);
-        setRefreshing(false);
         return;
       }
 
-      setDevices(devices);
-      const selectedDevice = devices[0];
+      setDevices(nextDevices);
+
+      const stillSelected =
+        device && nextDevices.find((d) => d.deviceId === device.deviceId);
+      const selectedDevice = stillSelected || nextDevices[0];
       setDevice(selectedDevice);
-
-      // Only fetch location history if we have a device
-      try {
-        const historyResponse = await fetchWithAutoRefresh(
-          `${process.env.NEXT_PUBLIC_API_URL}/locations/history/${selectedDevice.deviceId}`
-        );
-        
-        if (!historyResponse.ok) {
-          // If history endpoint fails, set empty location data but don't throw
-          console.warn("Failed to fetch location history, using empty data");
-          setLocationData([]);
-        } else {
-          const historyData = await historyResponse.json();
-          const locationArray = Array.isArray(historyData) ? historyData : historyData.history || historyData.locations || [];
-
-          const history: Location[] = locationArray.map((entry: LocationHistoryEntry) => ({
-            id: entry._id,
-            device: selectedDevice.name,
-            location: entry.locationName || "Unknown",
-            address: entry.locationName || "Unknown",
-            coordinates: {
-              lat: entry.location?.coordinates[1] || 0,
-              lng: entry.location?.coordinates[0] || 0,
-            },
-            timestamp: new Date(entry.recordedAt || entry.timestamp || Date.now()).toLocaleString(),
-            accuracy: entry.accuracy ? `${entry.accuracy}m` : "Unknown",
-            battery: entry.batteryLevel || 100,
-            duration: entry.duration || "Unknown",
-            activity: entry.activity || "Unknown",
-          }));
-        
-          setLocationData(history);
-        }
-      } catch (historyError) {
-        console.warn("Error fetching location history:", historyError);
-        setLocationData([]);
-      }
+      await fetchHistoryForDevice(selectedDevice);
 
       setError(null);
-      setCurrentPage(1);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch data";
       setError(errorMessage);
@@ -161,13 +164,23 @@ export default function LocationHistory() {
     }
   };
 
+  const handleDeviceChange = async (deviceId: string) => {
+    const selected = devices.find((d) => d.deviceId === deviceId);
+    if (!selected) return;
+    setDevice(selected);
+    setRefreshing(true);
+    await fetchHistoryForDevice(selected);
+    setRefreshing(false);
+  };
+
   // Initial data fetch
   useEffect(() => {
-    fetchData();
+    void fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only load
   }, []);
 
   const handleRefresh = () => {
-    fetchData(true);
+    void fetchData(true);
   };
 
   const handlePageChange = (page: number) => {
@@ -354,21 +367,42 @@ export default function LocationHistory() {
           >
             <Card className="bg-white/5 border-white/10 backdrop-blur-xl shadow-2xl">
               <CardContent className="p-8">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-gray-300 uppercase tracking-wider">
                       Current Device
                     </p>
-                    <p className="text-3xl font-bold text-white">{device.name}</p>
+                    {devices.length > 1 ? (
+                      <label className="block space-y-2">
+                        <span className="sr-only">Select device</span>
+                        <select
+                          value={device.deviceId}
+                          onChange={(e) => void handleDeviceChange(e.target.value)}
+                          className="w-full max-w-md rounded-lg border border-white/20 bg-black/40 px-4 py-3 text-lg font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          {devices.map((d) => (
+                            <option key={d.deviceId} value={d.deviceId} className="bg-black text-white">
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <p className="text-3xl font-bold text-white">{device.name}</p>
+                    )}
                     <p className="text-gray-400">Type: {device.type}</p>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-green-400" />
                       <p className="text-gray-400">
-                        Current Location: <span className="text-white font-medium">{device.locationName || "Unknown"}</span>
+                        Current Location:{" "}
+                        <span className="text-white font-medium">
+                          {device.locationName || "Unknown"}
+                        </span>
                       </p>
                     </div>
                     <p className="text-sm text-gray-500">
-                      Coordinates: {device.location.coordinates[1].toFixed(6)}, {device.location.coordinates[0].toFixed(6)}
+                      Coordinates: {device.location.coordinates[1].toFixed(6)},{" "}
+                      {device.location.coordinates[0].toFixed(6)}
                     </p>
                     {locationData.length > 0 && (
                       <p className="text-sm text-gray-500">
@@ -376,7 +410,7 @@ export default function LocationHistory() {
                       </p>
                     )}
                   </div>
-                  <div className="p-4 rounded-2xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30">
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 self-start">
                     <Smartphone className="h-12 w-12 text-green-400" />
                   </div>
                 </div>

@@ -403,12 +403,8 @@ export function RealTimeTracking() {
         setError(null)
         
         console.log("🔄 Fetching devices from API...")
-        const response = await fetch(`${API_URL}/devices/user-devices`, {
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
+        const { fetchWithAutoRefresh } = await import("@/lib/api")
+        const response = await fetchWithAutoRefresh(`${API_URL}/devices/user-devices`)
         
         if (!response.ok) {
           throw new Error(`Failed to fetch devices: ${response.statusText}`)
@@ -467,13 +463,11 @@ export function RealTimeTracking() {
   const handleDeviceClick = async (device: Device): Promise<void> => {
     try {
       console.log(`🎯 Starting tracking for device: ${device.deviceId}`)
-      const response = await fetch(`${API_URL}/devices/${device.deviceId}/start-tracking`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
+      const { fetchWithAutoRefresh } = await import("@/lib/api")
+      const response = await fetchWithAutoRefresh(
+        `${API_URL}/devices/${device.deviceId}/start-tracking`,
+        { method: 'POST' }
+      )
       
       if (!response.ok) {
         throw new Error(`Failed to start tracking: ${response.statusText}`)

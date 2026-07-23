@@ -6,11 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Smartphone, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { DirectRegistration } from "./direct-device-registration";
-import { useEffect } from "react";
+import { QRCodeRegistration } from "./qr-linking-registration";
+import { useEffect, useState } from "react";
 import { useDevicesStore } from "../store/devices";
 
 export function DeviceRegistration() {
   const { devices, isLoading, fetchDevices, removeDevice } = useDevicesStore();
+  const [mode, setMode] = useState<"direct" | "qr">("direct");
 
   useEffect(() => {
     fetchDevices(false);
@@ -48,8 +50,43 @@ export function DeviceRegistration() {
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-blue-200 to-blue-400 bg-clip-text text-transparent mb-2 sm:mb-3">
             Device Registration
           </h1>
-          <p className="text-gray-400 text-sm sm:text-base lg:text-lg">Register and track devices directly</p>
+          <p className="text-gray-400 text-sm sm:text-base lg:text-lg">
+            Register this browser as a device, or generate a QR for another phone
+          </p>
         </motion.div>
+
+        <div
+          className="inline-flex rounded-lg border border-white/15 bg-black/40 p-1 gap-1"
+          role="tablist"
+          aria-label="Registration method"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "direct"}
+            className={
+              mode === "direct"
+                ? "rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+                : "rounded-md px-4 py-2 text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white"
+            }
+            onClick={() => setMode("direct")}
+          >
+            Direct register
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "qr"}
+            className={
+              mode === "qr"
+                ? "rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+                : "rounded-md px-4 py-2 text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white"
+            }
+            onClick={() => setMode("qr")}
+          >
+            QR link
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Registration Form */}
@@ -59,7 +96,11 @@ export function DeviceRegistration() {
               animate={{ opacity: 1, x: 0 }} 
               transition={{ delay: 0.2 }}
             >
-              <DirectRegistration onDeviceRegistered={() => fetchDevices(true)} />
+              {mode === "direct" ? (
+                <DirectRegistration onDeviceRegistered={() => fetchDevices(true)} />
+              ) : (
+                <QRCodeRegistration onDeviceRegistered={() => fetchDevices(true)} />
+              )}
             </motion.div>
           </div>
         </div>

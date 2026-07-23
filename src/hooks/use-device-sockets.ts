@@ -93,7 +93,7 @@ export function useDeviceSocket(
   const [isTracking, setIsTracking] = useState(false);
   
   const {
-    enableTracking = true,
+    enableTracking = false,
     updateInterval = 30000, // 30 seconds default
     highAccuracy = true,
     maxAge = 60000,

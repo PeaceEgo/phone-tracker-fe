@@ -16,11 +16,7 @@ export default function Header({ variant = "landing", showNavLinks = true }: Hea
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { user, isAuthenticated, logout } = useAuthStore() 
 
-  // const navLinks = [
-  //   { href: "#features", label: "Features" },
-  //   { href: "#testimonials", label: "Reviews" },
-  //   { href: "#pricing", label: "Pricing" },
-  // ]
+  const navLinks = [{ href: "#features", label: "Features" }]
 
   const handleLogout = async () => {
     try {
@@ -55,11 +51,11 @@ export default function Header({ variant = "landing", showNavLinks = true }: Hea
           {/* Desktop Navigation */}
           {showNavLinks && variant === "landing" && (
             <div className="hidden md:flex items-center space-x-8">
-              {/* {navLinks.map((link) => (
+              {navLinks.map((link) => (
                 <a key={link.href} href={link.href} className="hover:text-blue-400 transition-colors duration-200">
                   {link.label}
                 </a>
-              ))} */}
+              ))}
               
               {/* Conditionally render based on whether user has an account */}
               {isAuthenticated ? (

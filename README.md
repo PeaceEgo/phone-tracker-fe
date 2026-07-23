@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TrackGuard (phone-tracker-fe)
 
-## Getting Started
+Next.js frontend for a device location tracker: cookie auth, device registration, location history, and Socket.IO live maps.
 
-First, run the development server:
+## Stack
+
+- Next.js 15 (App Router) · React 19 · TypeScript
+- Zustand · Zod · react-hook-form
+- Socket.IO client · Leaflet
+- Tailwind CSS · shadcn/ui
+
+## Setup
 
 ```bash
+cp .env.example .env
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_API_URL` | Backend REST base (e.g. `https://host/api`) |
+| `NEXT_PUBLIC_WS_URL` | Socket.IO origin (e.g. `wss://host`) |
+| `NEXT_PUBLIC_APP_URL` | Public HTTPS FE origin for QR links (match backend `PUBLIC_APP_URL`) |
 
-## Learn More
+The backend must allow credentials (cookies) from your frontend origin.
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run dev    # turbopack dev server
+npm run build  # production build
+npm run start  # serve production build
+npm run lint   # ESLint
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Features (what this app actually does)
 
-## Deploy on Vercel
+- Email/password auth with verify-email OTP
+- Register and manage tracked devices
+- Location history
+- Real-time map tracking over WebSockets
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Backend handoff
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See [`BACKEND_HANDOFF.md`](./BACKEND_HANDOFF.md) for the API contract, what FE already uses, and what backend should prioritize (password reset, QR status, socket payload confirmation).

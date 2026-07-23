@@ -137,7 +137,7 @@ const VerifyEmailContent = () => {
           <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-lg p-8">
             {/* Back button */}
             <button
-              onClick={() => router.push("/auth/register")}
+              onClick={() => router.push("/auth/signup")}
               className="flex items-center text-gray-400 hover:text-gray-300 mb-4"
             >
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
