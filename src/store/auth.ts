@@ -81,48 +81,42 @@ export const useAuthStore = create<AuthState>()(
           verificationEmail: email || null
         }),
 
-initializeAuth: async () => {
-  const state = get()
-  if (state.isInitialized || state.isLoading) return
+      initializeAuth: async () => {
+        const state = get()
+        if (state.isInitialized || state.isLoading) return
 
-  // Already logged in this session (e.g. just finished login) — don't wipe it
-  if (state.isAuthenticated && state.user) {
-    set({ isInitialized: true, isLoading: false })
-    return
-  }
+        set({ isLoading: true })
 
-  set({ isLoading: true })
-
-  try {
-    const user = await getCurrentUser();
-    if (user) {
-      set({
-        user: {
-          id: user.id,
-          name: user.fullName,
-          email: user.email
-        },
-        isAuthenticated: true,
-        isInitialized: true,
-        isLoading: false
-      });
-    } else {
-      set({
-        user: null,
-        isAuthenticated: false,
-        isInitialized: true,
-        isLoading: false
-      });
-    }
-  } catch {
-    set({
-      user: null,
-      isAuthenticated: false,
-      isInitialized: true,
-      isLoading: false
-    });
-  }
-},
+        try {
+          const user = await getCurrentUser();
+          if (user) {
+            set({
+              user: {
+                id: user.id,
+                name: user.fullName,
+                email: user.email
+              },
+              isAuthenticated: true,
+              isInitialized: true,
+              isLoading: false
+            });
+          } else {
+            set({
+              user: null,
+              isAuthenticated: false,
+              isInitialized: true,
+              isLoading: false
+            });
+          }
+        } catch {
+          set({
+            user: null,
+            isAuthenticated: false,
+            isInitialized: true,
+            isLoading: false
+          });
+        }
+      },
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null })
         try {

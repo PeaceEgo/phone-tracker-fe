@@ -141,9 +141,12 @@ export function QRCodeRegistration({ onDeviceRegistered }: QRCodeRegistrationPro
         throw new Error("Invalid QR response — missing qrCodeId")
       }
 
-      const linkUrl = deviceLinkPath(data.qrCodeId)
+      // Prefer backend linkUrl (includes claim + api). Fall back only if missing.
+      const linkUrl =
+        data.linkUrl && data.linkUrl.includes("claim=")
+          ? data.linkUrl
+          : deviceLinkPath(data.qrCodeId)
 
-      // Prefer backend image (already HTTPS /link-device/...), else build locally
       const qrCodeImage =
         data.qrCodeImage && data.qrCodeImage.startsWith("data:")
           ? data.qrCodeImage
@@ -161,7 +164,15 @@ export function QRCodeRegistration({ onDeviceRegistered }: QRCodeRegistrationPro
       })
       setShowQRCode(true)
       setQrCodeExpiry(typeof data.expiresIn === "number" ? data.expiresIn : 900)
-      toast.success("QR ready — scan with any phone camera or browser")
+
+      if (/localhost|127\.0\.0\.1/i.test(window.location.hostname)) {
+        toast.message("Phone hits production FE + API", {
+          description:
+            "Generate this QR against production BE (or redeploy local QR on prod). Local-only QR ids won’t exist on Render.",
+        })
+      } else {
+        toast.success("QR ready — scan with your phone (no login on phone)")
+      }
     } catch (err) {
       console.error("QR generation error:", err)
       toast.error(err instanceof Error ? err.message : "Unable to generate QR code")
@@ -196,7 +207,7 @@ export function QRCodeRegistration({ onDeviceRegistered }: QRCodeRegistrationPro
 
   const statusLabel =
     linkStatus === "pending"
-      ? "Waiting for device to open the link…"
+      ? "Waiting for phone to open the link…"
       : linkStatus === "linked"
         ? "Device linked"
         : linkStatus === "expired"
@@ -223,9 +234,11 @@ export function QRCodeRegistration({ onDeviceRegistered }: QRCodeRegistrationPro
               <h3 className="text-blue-300 font-medium mb-1">Scan to open link page</h3>
               <p className="text-sm text-gray-400">
                 QR opens{" "}
-                <code className="text-blue-300">/link-device/&#123;id&#125;</code> on the web app.
-                The phone must sign in as the same user, then we call{" "}
-                <code className="text-blue-300">POST /devices/link-by-qr</code>.
+                <code className="text-blue-300">/link-device/&#123;id&#125;?claim=…</code>.
+                The phone does <strong className="text-gray-300">not</strong> need to log in —
+                it calls{" "}
+                <code className="text-blue-300">POST /devices/qr/claim</code> and attaches to
+                your account.
               </p>
             </div>
           </div>

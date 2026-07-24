@@ -43,14 +43,10 @@ function LoginForm() {
 
   useEffect(() => {
     // Only redirect on a confirmed session — NOT persisted `user` alone
-    // (user without isAuthenticated causes login ↔ link-device bounce)
     if (isAuthenticated && !isRedirecting && !isLoggingIn) {
       setIsRedirecting(true);
-      // Full navigation after login so mobile browsers attach cookies reliably
-      if (safeNext.startsWith("/link-device")) {
-        window.location.assign(safeNext);
-        return;
-      }
+      // Soft navigate — keep Zustand session; hard reload re-ran /me and
+      // bounced phones back to login when cookies weren't readable yet.
       router.replace(safeNext);
     }
   }, [isAuthenticated, router, isRedirecting, safeNext, isLoggingIn]);

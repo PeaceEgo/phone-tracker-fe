@@ -1,40 +1,31 @@
 # Backend ↔ Frontend contract — TrackGuard
 
-Cookie sessions via **same-origin proxy** (`NEXT_PUBLIC_API_URL=/backend/api` → `BACKEND_URL`).
-This is required so mobile browsers keep auth cookies (cross-site Vercel→Render cookies get blocked).
+## Auth cookies
 
-**FE env**
-- `NEXT_PUBLIC_API_URL=/backend/api`
-- `BACKEND_URL=https://phone-tracker-be.onrender.com`
-- `NEXT_PUBLIC_WS_URL=wss://…`
-- `NEXT_PUBLIC_APP_URL` — public HTTPS FE (match backend `PUBLIC_APP_URL`)
+FE calls **`/backend/api/*`** (Next route proxy → `BACKEND_URL`) for cookie-authenticated desktop calls.
 
-Socket.IO uses `handshake.auth.token` from FE `/api/socket-token` (reads httpOnly cookie).
+Login/refresh may also return `accessToken` / `refreshToken` (Bearer) when cookies are blocked.
 
-## Auth
-| Method | Path |
-|--------|------|
-| POST | `/auth/login` |
-| POST | `/auth/register` |
-| POST | `/auth/verify-email` |
-| POST | `/auth/resend-verification` |
-| POST | `/auth/logout` |
-| GET | `/auth/me` |
-| POST | `/auth/refresh` |
-| POST | `/auth/forgot-password` |
-| POST | `/auth/reset-password` |
+**FE env (Vercel + local)**
+```
+NEXT_PUBLIC_API_URL=/backend/api
+BACKEND_URL=https://phone-tracker-be.onrender.com
+NEXT_PUBLIC_WS_URL=wss://phone-tracker-be.onrender.com
+NEXT_PUBLIC_APP_URL=https://phone-tracker-fe.vercel.app
+```
 
-## Devices
-| Method | Path |
-|--------|------|
-| GET | `/devices/user-devices` |
-| POST | `/devices/register` |
-| DELETE | `/devices/:deviceId` |
-| POST | `/devices/generate-qr` |
-| GET | `/devices/qr/:qrCodeId/status` |
-| POST | `/devices/link-by-qr` `{ qrCodeId, location? }` |
-| POST | `/devices/:deviceId/start-tracking` |
-| GET | `/locations/history/:deviceId` |
+Socket.IO uses `handshake.auth.token` from `/api/socket-token`.
 
-**QR:** `https://{PUBLIC_APP_URL}/link-device/{qrCodeId}`  
-FE route completes GPS + `link-by-qr`.
+## QR link flow (no phone login)
+
+1. Desktop (cookie auth): `POST /devices/generate-qr` → `{ qrCodeId, linkUrl, expiresIn, qrCodeImage }`
+2. QR encodes  
+   `https://{PUBLIC_APP_URL}/link-device/{qrCodeId}?claim={claimToken}&api={API_URL}`
+3. Phone opens FE (**no login**):
+   - `GET /devices/qr/:id/info?claim=` — public preview
+   - `POST /devices/qr/claim` `{ qrCodeId, claimToken, location? }` — links to generator’s account
+4. Desktop polls `GET /devices/qr/:id/status` (cookie) until `linked`
+
+Use `?api=` from the QR so the phone hits the **same** backend that minted the QR (host allowlisted on FE).
+
+**Important:** If you generate the QR on local BE, Vercel → production API will not find it. Generate against production (or redeploy BE), then scan a fresh QR.

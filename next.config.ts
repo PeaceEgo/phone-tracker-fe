@@ -1,21 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  async rewrites() {
-    const backend = (
-      process.env.BACKEND_URL ||
-      "https://phone-tracker-be.onrender.com"
-    ).replace(/\/$/, "");
-
-    return [
-      {
-        // Same-origin proxy so auth cookies are first-party on the FE host
-        // (required for mobile Safari/Chrome ITP with split FE/BE domains)
-        source: "/backend/:path*",
-        destination: `${backend}/:path*`,
-      },
-    ];
-  },
+  // Auth proxy is implemented in src/app/backend/[...path]/route.ts
+  // (rewrites alone drop/mangle Set-Cookie on some mobile browsers)
 };
 
 module.exports = nextConfig;

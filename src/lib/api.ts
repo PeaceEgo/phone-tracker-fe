@@ -248,6 +248,67 @@ export interface QrStatusResponse {
   };
 }
 
+export interface QrPublicInfoResponse {
+  status: QrLinkStatus;
+  name: string | null;
+  type: string | null;
+  expiresAt: string | null;
+}
+
+const ALLOWED_CLAIM_API_HOSTS = [
+  "phone-tracker-be.onrender.com",
+  "localhost",
+  "127.0.0.1",
+];
+
+/**
+ * Resolve which API base the phone should call for public claim/info.
+ * Prefer `?api=` from the QR (same backend that minted it), with a host allowlist.
+ */
+export function resolveClaimApiBase(apiFromQuery?: string | null): string {
+  const fallback = (API_BASE || "/backend/api").replace(/\/$/, "");
+  if (!apiFromQuery) return fallback;
+
+  const trimmed = apiFromQuery.trim().replace(/\/$/, "");
+  if (!trimmed) return fallback;
+
+  // Same-origin relative proxy path
+  if (trimmed.startsWith("/")) return trimmed;
+
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return fallback;
+
+    const hostOk = ALLOWED_CLAIM_API_HOSTS.some(
+      (h) => url.hostname === h || url.hostname.endsWith(`.${h}`)
+    );
+    if (!hostOk) return fallback;
+
+    // Expect .../api suffix when pointing at Nest
+    return trimmed;
+  } catch {
+    return fallback;
+  }
+}
+
+function claimApiUrl(apiBase: string, path: string) {
+  return `${apiBase.replace(/\/$/, "")}${path}`;
+}
+
+/** Public fetch — no cookies (phone Safari blocks third-party auth cookies). */
+async function publicJsonFetch(input: string, init: RequestInit = {}) {
+  const headers = new Headers(init.headers || {});
+  if (!headers.has("Content-Type") && init.body) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  return fetch(input, {
+    ...init,
+    credentials: "omit",
+    headers,
+  });
+}
+
 export async function generateDeviceQr(data: {
   name: string;
   type: "android" | "ios";
@@ -255,6 +316,7 @@ export async function generateDeviceQr(data: {
   qrCodeId: string;
   qrCodeImage?: string;
   expiresIn: number;
+  linkUrl?: string;
   message?: string;
 }> {
   const res = await fetchWithAutoRefresh(apiUrl("/devices/generate-qr"), {
@@ -271,6 +333,67 @@ export async function getQrLinkStatus(qrCodeId: string): Promise<QrStatusRespons
   return res.json();
 }
 
+/** Public: phone landing preview. */
+export async function getPublicQrInfo(
+  qrCodeId: string,
+  claimToken: string,
+  apiBase?: string | null
+): Promise<QrPublicInfoResponse> {
+  const base = resolveClaimApiBase(apiBase);
+  const res = await publicJsonFetch(
+    claimApiUrl(base, `/devices/qr/${encodeURIComponent(qrCodeId)}/info?claim=${encodeURIComponent(claimToken)}`)
+  );
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.message || "Failed to load QR info");
+  }
+  return body;
+}
+
+/** Public: phone claims device for the QR generator's account (no login). */
+export async function claimDeviceByQr(data: {
+  qrCodeId: string;
+  claimToken: string;
+  location?: { latitude: number; longitude: number };
+  deviceFingerprint?: string;
+  userAgent?: string;
+  apiBase?: string | null;
+}): Promise<{
+  message: string;
+  device: {
+    deviceId: string;
+    name: string;
+    type: string;
+    location?: unknown;
+    locationName?: string;
+  };
+}> {
+  const base = resolveClaimApiBase(data.apiBase);
+  const res = await publicJsonFetch(claimApiUrl(base, "/devices/qr/claim"), {
+    method: "POST",
+    body: JSON.stringify({
+      qrCodeId: data.qrCodeId,
+      claimToken: data.claimToken,
+      ...(data.deviceFingerprint ? { deviceFingerprint: data.deviceFingerprint } : {}),
+      ...(data.userAgent ? { userAgent: data.userAgent } : {}),
+      ...(data.location
+        ? {
+            location: {
+              latitude: data.location.latitude,
+              longitude: data.location.longitude,
+            },
+          }
+        : {}),
+    }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.message || "Failed to claim device");
+  }
+  return body;
+}
+
+/** @deprecated Prefer claimDeviceByQr — kept for older companions. */
 export async function linkDeviceByQr(data: {
   qrCodeId: string;
   location?: { latitude: number; longitude: number };
@@ -284,7 +407,6 @@ export async function linkDeviceByQr(data: {
     locationName?: string;
   };
 }> {
-  // Never hard-redirect away from /link-device on 401 — page handles re-auth with ?next=
   const res = await fetchWithAutoRefresh(
     apiUrl("/devices/link-by-qr"),
     {
@@ -308,7 +430,6 @@ export function getPublicAppUrl(): string {
   }
   if (typeof window !== "undefined" && window.location?.origin) {
     const origin = window.location.origin.replace(/\/$/, "");
-    // Prefer production HTTPS when generating QRs that phones must scan
     if (!/localhost|127\.0\.0\.1/i.test(origin)) {
       return origin;
     }
@@ -316,6 +437,21 @@ export function getPublicAppUrl(): string {
   return configured || "https://phone-tracker-fe.vercel.app";
 }
 
-export function deviceLinkPath(qrCodeId: string): string {
-  return `${getPublicAppUrl()}/link-device/${qrCodeId}`;
+/** Absolute production API base embedded in QR `api=` when generating client-side. */
+export function getPublicApiUrlForQr(): string {
+  const fromEnv = (process.env.NEXT_PUBLIC_CLAIM_API_URL || "").replace(/\/$/, "");
+  if (fromEnv && /^https?:\/\//i.test(fromEnv)) return fromEnv;
+  return "https://phone-tracker-be.onrender.com/api";
+}
+
+export function deviceLinkPath(
+  qrCodeId: string,
+  options?: { claimToken?: string; apiBase?: string }
+): string {
+  const params = new URLSearchParams();
+  if (options?.claimToken) params.set("claim", options.claimToken);
+  const api = options?.apiBase || getPublicApiUrlForQr();
+  if (api) params.set("api", api);
+  const qs = params.toString();
+  return `${getPublicAppUrl()}/link-device/${qrCodeId}${qs ? `?${qs}` : ""}`;
 }

@@ -1,40 +1,39 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Smartphone, Loader2, MapPin, CheckCircle2, AlertCircle, LogIn } from "lucide-react";
+import {
+  Smartphone,
+  Loader2,
+  MapPin,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useAuthStore } from "@/store/auth";
-import { linkDeviceByQr } from "@/lib/api";
+import { claimDeviceByQr, getPublicQrInfo } from "@/lib/api";
 
-type Phase =
-  | "checking-auth"
-  | "need-login"
-  | "locating"
-  | "linking"
-  | "success"
-  | "error";
+type Phase = "loading" | "ready" | "locating" | "claiming" | "success" | "error";
 
-export default function LinkDevicePage() {
+function LinkDeviceContent() {
   const params = useParams<{ qrCodeId: string }>();
-  const router = useRouter();
-  const qrCodeId = params?.qrCodeId;
+  const searchParams = useSearchParams();
+  const qrCodeId = params?.qrCodeId || "";
+  const claimToken = searchParams.get("claim") || "";
+  const apiFromQuery = searchParams.get("api");
 
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const isInitialized = useAuthStore((s) => s.isInitialized);
-  const user = useAuthStore((s) => s.user);
-
-  const [phase, setPhase] = useState<Phase>("checking-auth");
+  const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState<string | null>(null);
+  const [previewType, setPreviewType] = useState<string | null>(null);
   const [deviceName, setDeviceName] = useState<string | null>(null);
   const startedRef = useRef(false);
 
-  const loginHref = `/auth/login?next=${encodeURIComponent(`/link-device/${qrCodeId || ""}`)}`;
-
-  const getLocation = useCallback((): Promise<{ latitude: number; longitude: number } | undefined> => {
+  const getLocation = useCallback((): Promise<
+    { latitude: number; longitude: number } | undefined
+  > => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
         resolve(undefined);
@@ -54,10 +53,17 @@ export default function LinkDevicePage() {
     });
   }, []);
 
-  const completeLink = useCallback(async () => {
+  const completeClaim = useCallback(async () => {
     if (!qrCodeId) {
       setPhase("error");
       setError("Missing QR code id");
+      return;
+    }
+    if (!claimToken) {
+      setPhase("error");
+      setError(
+        "This link is missing a claim token. Generate a new QR from the dashboard."
+      );
       return;
     }
 
@@ -66,45 +72,82 @@ export default function LinkDevicePage() {
 
     try {
       const location = await getLocation();
-      setPhase("linking");
+      setPhase("claiming");
 
-      const result = await linkDeviceByQr({
+      const result = await claimDeviceByQr({
         qrCodeId,
+        claimToken,
+        apiBase: apiFromQuery,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
         ...(location ? { location } : {}),
       });
 
-      setDeviceName(result.device?.name || "Device");
+      setDeviceName(result.device?.name || previewName || "Device");
       setPhase("success");
-      setTimeout(() => router.replace("/dashboard"), 2200);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to link device";
-      // Session lost — send to login with return URL (no hard bounce loop)
-      if (/log in|session expired|authentication failed/i.test(message)) {
-        setPhase("need-login");
-        setError("Please sign in again to finish linking.");
-        return;
-      }
       setPhase("error");
       setError(message);
     }
-  }, [getLocation, qrCodeId, router]);
+  }, [apiFromQuery, claimToken, getLocation, previewName, qrCodeId]);
 
   useEffect(() => {
-    if (!isInitialized) {
-      setPhase("checking-auth");
+    if (!qrCodeId || !claimToken) {
+      setPhase("error");
+      setError(
+        !qrCodeId
+          ? "Missing QR code id"
+          : "This link is missing a claim token. Generate a new QR from the dashboard."
+      );
       return;
     }
 
-    if (!isAuthenticated) {
-      startedRef.current = false;
-      setPhase("need-login");
-      return;
-    }
+    let cancelled = false;
 
-    if (startedRef.current) return;
+    (async () => {
+      try {
+        const info = await getPublicQrInfo(qrCodeId, claimToken, apiFromQuery);
+        if (cancelled) return;
+
+        setPreviewName(info.name);
+        setPreviewType(info.type);
+
+        if (info.status === "linked") {
+          setDeviceName(info.name || "Device");
+          setPhase("success");
+          return;
+        }
+        if (info.status === "expired") {
+          setPhase("error");
+          setError("This QR code has expired. Generate a new one on the dashboard.");
+          return;
+        }
+        if (info.status === "not_found") {
+          setPhase("error");
+          setError(
+            "QR not found. Generate against the production API if you scanned from Vercel."
+          );
+          return;
+        }
+
+        setPhase("ready");
+      } catch {
+        if (cancelled) return;
+        // Still allow claim attempt if info endpoint is down
+        setPhase("ready");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiFromQuery, claimToken, qrCodeId]);
+
+  useEffect(() => {
+    if (phase !== "ready" || startedRef.current) return;
     startedRef.current = true;
-    void completeLink();
-  }, [isInitialized, isAuthenticated, completeLink]);
+    void completeClaim();
+  }, [phase, completeClaim]);
 
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center p-6 relative overflow-hidden">
@@ -128,29 +171,15 @@ export default function LinkDevicePage() {
           <CardContent className="p-8 text-center space-y-4">
             <h1 className="text-2xl font-bold">Link this device</h1>
             <p className="text-sm text-gray-400">
-              Completes QR pairing for code{" "}
-              <span className="font-mono text-gray-300 break-all">{qrCodeId}</span>
+              {previewName
+                ? `Pairing “${previewName}”${previewType ? ` (${previewType})` : ""}`
+                : "No login needed — this one-time link attaches the phone to the account that created the QR."}
             </p>
 
-            {phase === "checking-auth" && (
+            {(phase === "loading" || phase === "ready") && (
               <div className="flex flex-col items-center gap-3 py-4">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
-                <p className="text-gray-400">Checking session…</p>
-              </div>
-            )}
-
-            {phase === "need-login" && (
-              <div className="space-y-4 py-2">
-                <p className="text-gray-300">
-                  Sign in with the <strong>same account</strong> that generated this QR code.
-                </p>
-                {error && <p className="text-amber-300 text-sm">{error}</p>}
-                <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                  <Link href={loginHref}>
-                    <LogIn className="w-4 h-4 mr-2" />
-                    Sign in to continue
-                  </Link>
-                </Button>
+                <p className="text-gray-400">Preparing link…</p>
               </div>
             )}
 
@@ -159,13 +188,10 @@ export default function LinkDevicePage() {
                 <MapPin className="h-8 w-8 text-green-400 animate-pulse" />
                 <p className="text-gray-400">Getting this device&apos;s location…</p>
                 <p className="text-xs text-gray-500">Allow location when prompted</p>
-                {user?.email && (
-                  <p className="text-xs text-gray-500">Signed in as {user.email}</p>
-                )}
               </div>
             )}
 
-            {phase === "linking" && (
+            {phase === "claiming" && (
               <div className="flex flex-col items-center gap-3 py-4">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
                 <p className="text-gray-400">Linking device…</p>
@@ -178,7 +204,12 @@ export default function LinkDevicePage() {
                 <p className="text-white font-medium">
                   {deviceName ? `${deviceName} linked` : "Device linked"}
                 </p>
-                <p className="text-sm text-gray-400">Opening dashboard…</p>
+                <p className="text-sm text-gray-400">
+                  You can close this tab. The dashboard will show the device shortly.
+                </p>
+                <Button asChild variant="outline" className="w-full mt-2">
+                  <Link href="/">Done</Link>
+                </Button>
               </div>
             )}
 
@@ -189,20 +220,19 @@ export default function LinkDevicePage() {
                   <p className="text-red-300 text-sm">{error}</p>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Button
-                    onClick={() => {
-                      startedRef.current = true;
-                      void completeLink();
-                    }}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    Try again
-                  </Button>
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href={loginHref}>Sign in again</Link>
-                  </Button>
+                  {claimToken && qrCodeId && (
+                    <Button
+                      onClick={() => {
+                        startedRef.current = false;
+                        setPhase("ready");
+                      }}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      Try again
+                    </Button>
+                  )}
                   <Button asChild variant="ghost" className="w-full">
-                    <Link href="/dashboard">Go to dashboard</Link>
+                    <Link href="/">Back to home</Link>
                   </Button>
                 </div>
               </div>
@@ -211,5 +241,19 @@ export default function LinkDevicePage() {
         </Card>
       </motion.div>
     </div>
+  );
+}
+
+export default function LinkDevicePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-black flex items-center justify-center text-gray-400">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        </div>
+      }
+    >
+      <LinkDeviceContent />
+    </Suspense>
   );
 }
