@@ -200,13 +200,6 @@ export async function getCurrentUser(): Promise<{
   }
 }
 
-export async function invalidateAllSessions(): Promise<void> {
-  const res = await fetchWithAutoRefresh(apiUrl("/auth/invalidate-sessions"), {
-    method: "POST",
-  });
-  if (!res.ok) throw new Error((await res.json()).message || "Failed to invalidate sessions");
-}
-
 export async function forgotPassword(email: string): Promise<{ message: string }> {
   const res = await fetchWithCreds(apiUrl("/auth/forgot-password"), {
     method: "POST",
@@ -389,35 +382,6 @@ export async function claimDeviceByQr(data: {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(body.message || "Failed to claim device");
-  }
-  return body;
-}
-
-/** @deprecated Prefer claimDeviceByQr — kept for older companions. */
-export async function linkDeviceByQr(data: {
-  qrCodeId: string;
-  location?: { latitude: number; longitude: number };
-}): Promise<{
-  message: string;
-  device: {
-    deviceId: string;
-    name: string;
-    type: string;
-    location?: unknown;
-    locationName?: string;
-  };
-}> {
-  const res = await fetchWithAutoRefresh(
-    apiUrl("/devices/link-by-qr"),
-    {
-      method: "POST",
-      body: JSON.stringify(data),
-    },
-    { redirectOnAuthFailure: false }
-  );
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(body.message || "Failed to link device");
   }
   return body;
 }

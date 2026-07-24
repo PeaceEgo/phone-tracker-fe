@@ -151,7 +151,6 @@ export function TrackingMap({
   const updateTrail = useCallback((deviceId: string, trail: Array<{ lat: number; lng: number; timestamp: string }>) => {
     if (!map || !trail || trail.length < 2) return
 
-    console.log(`🛤️ Updating trail for device ${deviceId} with ${trail.length} points`)
 
     // Remove existing trail
     const existingTrail = trailsRef.current.get(deviceId)
@@ -175,7 +174,6 @@ export function TrackingMap({
   const updateMarker = useCallback((deviceId: string, lat: number, lng: number, device: Device, lastUpdate: string) => {
     if (!map) return
 
-    console.log(`🎯 Updating marker for device ${deviceId} at [${lat}, ${lng}]`)
 
     const marker = markersRef.current.get(deviceId)
     if (marker) {
@@ -186,10 +184,8 @@ export function TrackingMap({
       const popupContent = createPopupContent(device, lat, lng, lastUpdate)
       marker.setPopupContent(popupContent)
       
-      console.log(`✅ Updated existing marker for ${deviceId}`)
     } else {
       // Create new marker
-      console.log(`🆕 Creating new marker for ${deviceId}`)
       
       const newMarker = L.marker([lat, lng], {
         icon: createMarkerIcon(device.status === 'online')
@@ -203,7 +199,6 @@ export function TrackingMap({
 
       if (onDeviceClick) {
         newMarker.on("click", () => {
-          console.log(`🖱️ Marker clicked for device: ${deviceId}`)
           onDeviceClick(device)
         })
       }
@@ -247,7 +242,6 @@ export function TrackingMap({
         })
 
         if (mapRef.current && !mapInstanceRef.current) {
-          console.log("🗺️ Initializing Leaflet map...")
 
           const newMapInstance = L.map(mapRef.current, {
             center: [40.7589, -73.9851] as [number, number], 
@@ -275,7 +269,6 @@ export function TrackingMap({
           setMap(newMapInstance)
           setIsLoading(false)
 
-          console.log("✅ Map initialized successfully")
         }
       } catch (err) {
         console.error("❌ Error initializing map:", err)
@@ -290,7 +283,6 @@ export function TrackingMap({
 
     return () => {
       if (mapInstanceRef.current) {
-        console.log("🧹 Cleaning up map instance")
         mapInstanceRef.current.remove()
         mapInstanceRef.current = null
         setMap(null)
@@ -301,14 +293,11 @@ export function TrackingMap({
   // Handle WebSocket location updates - moved formatLastUpdate inside
   useEffect(() => {
     if (!socket || !map) {
-      console.log("⚠️ Socket or map not available for location updates")
       return
     }
 
-    console.log("🔌 Setting up WebSocket location update handlers for map")
 
     const handleLocationUpdate = (payload: LocationUpdate) => {
-      console.log("📍 Map received location update:", payload)
       
       try {
         const { deviceId, location, updatedAt } = payload
@@ -323,7 +312,6 @@ export function TrackingMap({
           lat = location.coordinates[1]
         }
 
-        console.log(`📊 Extracted coordinates for ${deviceId}: [${lat}, ${lng}]`)
 
         // Find the device in our list
         const device = devices.find((d) => d.deviceId === deviceId)
@@ -343,14 +331,12 @@ export function TrackingMap({
           map.fitBounds(bounds.pad(0.1))
         }
 
-        console.log(`✅ Map updated for device ${deviceId}`)
       } catch (err) {
         console.error("❌ Error handling location update in map:", err)
       }
     }
 
     const handleDeviceNotification = (payload: LocationUpdate) => {
-      console.log("🔔 Map received device notification:", payload)
       if (payload.location) {
         handleLocationUpdate(payload)
       }
@@ -360,10 +346,8 @@ export function TrackingMap({
     socket.on("locationUpdate", handleLocationUpdate)
     socket.on("deviceNotification", handleDeviceNotification)
 
-    console.log("✅ WebSocket event handlers registered for map")
 
     return () => {
-      console.log("🧹 Cleaning up WebSocket event handlers for map")
       socket.off("locationUpdate", handleLocationUpdate)
       socket.off("deviceNotification", handleDeviceNotification)
     }
@@ -372,18 +356,15 @@ export function TrackingMap({
   // Update markers when devices change (initial load and status updates)
   useEffect(() => {
     if (!map || !devices.length) {
-      console.log("⚠️ Map or devices not available for initial marker setup")
       return
     }
 
-    console.log(`🎯 Setting up initial markers for ${devices.length} devices`)
 
     const updateAllMarkers = () => {
       try {
         // Remove markers for devices no longer in the list
         markersRef.current.forEach((marker, deviceId) => {
           if (!devices.some((d) => d.deviceId === deviceId)) {
-            console.log(`🗑️ Removing marker for device ${deviceId}`)
             map.removeLayer(marker)
             markersRef.current.delete(deviceId)
           }
@@ -392,7 +373,6 @@ export function TrackingMap({
         // Remove trails for devices no longer in the list
         trailsRef.current.forEach((trail, deviceId) => {
           if (!devices.some((d) => d.deviceId === deviceId)) {
-            console.log(`🗑️ Removing trail for device ${deviceId}`)
             map.removeLayer(trail)
             trailsRef.current.delete(deviceId)
           }
@@ -403,10 +383,8 @@ export function TrackingMap({
           device.coordinates.lat !== 0 || device.coordinates.lng !== 0
         )
         
-        console.log(`📍 Found ${devicesWithCoordinates.length} devices with coordinates`)
 
         if (devicesWithCoordinates.length === 0) {
-          console.log("⚠️ No devices with valid coordinates found")
           return
         }
 
@@ -421,11 +399,9 @@ export function TrackingMap({
 
         // Fit map to show all markers
         if (bounds.isValid() && devicesWithCoordinates.length > 0) {
-          console.log("🎯 Fitting map bounds to show all devices")
           map.fitBounds(bounds.pad(0.1))
         }
 
-        console.log(`✅ Initial markers setup complete for ${devicesWithCoordinates.length} devices`)
       } catch (err) {
         console.error("❌ Error updating markers:", err)
       }

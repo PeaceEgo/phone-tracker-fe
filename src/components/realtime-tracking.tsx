@@ -142,7 +142,6 @@ export function RealTimeTracking() {
   // Cleanup socket connection
   const cleanupSocket = useCallback(() => {
     if (socketRef.current) {
-      console.log("Cleaning up socket connection")
       socketRef.current.removeAllListeners()
       socketRef.current.disconnect()
       socketRef.current = null
@@ -158,7 +157,6 @@ export function RealTimeTracking() {
 
   // Update device location from WebSocket - THIS IS THE KEY FUNCTION
   const updateDeviceLocation = useCallback((payload: LocationUpdate) => {
-    console.log("📍 Updating device location:", payload)
     
     setDevices((prevDevices) => {
       const updatedDevices = prevDevices.map((device) => {
@@ -201,17 +199,11 @@ export function RealTimeTracking() {
             trail: updatedTrail
           };
 
-          console.log(`✅ Updated device ${device.deviceId}:`, updatedDevice.coordinates);
           return updatedDevice;
         }
         return device;
       });
 
-      console.log("📊 All devices after update:", updatedDevices.map(d => ({ 
-        id: d.deviceId, 
-        coords: d.coordinates, 
-        status: d.status 
-      })));
       
       return updatedDevices;
     });
@@ -221,12 +213,10 @@ export function RealTimeTracking() {
   const initializeSocket = useCallback(async (deviceIds: string[] = []) => {
     // Prevent multiple simultaneous connection attempts
     if (connectionAttemptRef.current) {
-      console.log("Connection attempt already in progress")
       return
     }
 
     if (deviceIds.length === 0) {
-      console.log("No devices to track, skipping socket connection")
       return
     }
 
@@ -243,8 +233,6 @@ export function RealTimeTracking() {
       // Clean up any existing connection
       cleanupSocket()
 
-      console.log(`🚀 Attempting to connect to WebSocket: ${WS_URL}`)
-      console.log(`📱 Device IDs to watch: ${deviceIds.join(', ')}`)
 
       const { getSocketAuthToken } = await import("@/lib/socket-auth")
       const token = await getSocketAuthToken()
@@ -270,7 +258,6 @@ export function RealTimeTracking() {
 
       // Connection successful
       socket.on("connect", () => {
-        console.log("✅ WebSocket connected successfully, ID:", socket.id)
         setConnectionState({
           isConnected: true,
           isConnecting: false,
@@ -281,7 +268,6 @@ export function RealTimeTracking() {
         
         // Join rooms for all devices
         deviceIds.forEach((deviceId) => {
-          console.log(`📱 Watching device: ${deviceId}`)
           socket.emit("watchDevice", { deviceId })
         })
 
@@ -313,7 +299,6 @@ export function RealTimeTracking() {
 
       // Disconnection handling
       socket.on("disconnect", (reason: string) => {
-        console.log(`🔌 WebSocket disconnected: ${reason}`)
         setConnectionState(prev => ({
           ...prev,
           isConnected: false,
@@ -326,7 +311,6 @@ export function RealTimeTracking() {
 
       // Reconnection attempts
       socket.on("reconnect_attempt", (attemptNumber: number) => {
-        console.log(`🔄 Reconnection attempt ${attemptNumber}`)
         setConnectionState(prev => ({
           ...prev,
           isConnecting: true,
@@ -347,13 +331,11 @@ export function RealTimeTracking() {
 
       // CRITICAL: Location update handler - This receives real-time updates
       socket.on("locationUpdate", (payload: LocationUpdate) => {
-        console.log("📍 Location update received from server:", payload)
         updateDeviceLocation(payload)
       })
 
       // Device notification handler - May also contain location data
       socket.on("deviceNotification", (payload: LocationUpdate) => {
-        console.log("🔔 Device notification received:", payload)
         // Device notifications can also contain location updates
         if (payload.location) {
           updateDeviceLocation(payload)
@@ -362,7 +344,6 @@ export function RealTimeTracking() {
 
       // Tracking started handler
       socket.on("trackingStarted", (data: { deviceId: string; message: string; timestamp: string }) => {
-        console.log("▶️ Tracking started for device:", data.deviceId)
         setDevices(prev => prev.map(device => 
           device.deviceId === data.deviceId 
             ? { ...device, status: 'online', lastUpdate: formatLastUpdate(data.timestamp) }
@@ -373,7 +354,6 @@ export function RealTimeTracking() {
       // Pong response
       socket.on('pong', () => {
         // Heartbeat response received - connection is alive
-        console.log("💗 Heartbeat pong received")
       })
 
       connectionAttemptRef.current = false
@@ -392,7 +372,6 @@ export function RealTimeTracking() {
 
   // Manual reconnection function
   const handleManualReconnect = useCallback(() => {
-    console.log("🔄 Manual reconnection requested")
     const deviceIds = devices.map(d => d.deviceId)
     initializeSocket(deviceIds)
   }, [devices, initializeSocket])
@@ -406,7 +385,6 @@ export function RealTimeTracking() {
         setIsLoading(true)
         setError(null)
         
-        console.log("🔄 Fetching devices from API...")
         const { fetchWithAutoRefresh } = await import("@/lib/api")
         const response = await fetchWithAutoRefresh(`${API_URL}/devices/user-devices`)
         
@@ -420,11 +398,6 @@ export function RealTimeTracking() {
           transformBackendDevice(device, index)
         )
         
-        console.log(`✅ Loaded ${transformedDevices.length} devices:`, transformedDevices.map(d => ({
-          id: d.deviceId,
-          name: d.name,
-          coords: d.coordinates
-        })))
         
         setDevices(transformedDevices)
         hasInitializedRef.current = true;
@@ -444,7 +417,6 @@ export function RealTimeTracking() {
   useEffect(() => {
     if (devices.length > 0 && !connectionState.isConnected && !connectionState.isConnecting && hasInitializedRef.current) {
       const deviceIds = devices.map(d => d.deviceId)
-      console.log(`🚀 Initializing WebSocket for ${deviceIds.length} devices:`, deviceIds)
       
       // Small delay to ensure component is mounted
       const timer = setTimeout(() => {
@@ -458,7 +430,6 @@ export function RealTimeTracking() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      console.log("🧹 Component unmounting, cleaning up...")
       cleanupSocket()
     }
   }, [cleanupSocket])
@@ -466,7 +437,6 @@ export function RealTimeTracking() {
   // Handle device click to start tracking
   const handleDeviceClick = async (device: Device): Promise<void> => {
     try {
-      console.log(`🎯 Starting tracking for device: ${device.deviceId}`)
       const { fetchWithAutoRefresh } = await import("@/lib/api")
       const response = await fetchWithAutoRefresh(
         `${API_URL}/devices/${device.deviceId}/start-tracking`,
@@ -476,9 +446,8 @@ export function RealTimeTracking() {
       if (!response.ok) {
         throw new Error(`Failed to start tracking: ${response.statusText}`)
       }
-      
-      const result = await response.json()
-      console.log(`✅ Started tracking for device ${device.deviceId}:`, result)
+
+      await response.json().catch(() => null)
       
       // Update device status immediately
       setDevices(prev => prev.map(d => 
@@ -488,7 +457,7 @@ export function RealTimeTracking() {
       ))
       
     } catch (err: unknown) {
-      console.error("❌ Error starting tracking:", err)
+      console.error("Error starting tracking:", err)
       const errorMessage = err instanceof Error ? err.message : "Failed to start tracking"
       setError(errorMessage)
     }

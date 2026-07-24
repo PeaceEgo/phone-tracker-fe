@@ -43,42 +43,6 @@ interface LocationHistoryResponse {
   timePeriod?: string;
 }
 
-interface DistanceCoveredResponse {
-  distance: number;
-  unit: string;
-  timePeriod: string;
-  deviceId?: string;
-  deviceName?: string;
-}
-
-interface LocationTrailResponse {
-  trail: Array<{
-    latitude: number;
-    longitude: number;
-    timestamp: string;
-    accuracy?: number;
-    speed?: number;
-    heading?: number;
-  }>;
-  totalPoints: number;
-  deviceId?: string;
-  deviceName?: string;
-  timePeriod?: string;
-}
-
-interface LocationStatsResponse {
-  totalLocations: number;
-  averageDailyLocations: number;
-  mostActiveDay: string;
-  distanceCovered: number;
-  timePeriod: string;
-  deviceId?: string;
-  deviceName?: string;
-  maxSpeed?: number;
-  avgSpeed?: number;
-  totalDistance?: number;
-}
-
 interface DevicesState {
   devices: Device[];
   isLoading: boolean;
@@ -93,9 +57,6 @@ interface DevicesState {
   clearDevices: () => void;
   fetchLocationHistory: (deviceId: string) => Promise<LocationHistoryResponse>;
   updateOnlineStatusFromHistory: (deviceId: string, latestTimestamp: string) => void;
-  fetchDistanceCovered: (deviceId: string, hours?: number) => Promise<DistanceCoveredResponse>;
-  fetchLocationTrail: (deviceId: string, hours?: number) => Promise<LocationTrailResponse>;
-  fetchLocationStats: (deviceId: string, days?: number) => Promise<LocationStatsResponse>;
 }
 
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache
@@ -114,19 +75,16 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
     
     // Check if we have a fetch in progress
     if (state.fetchPromise && !forceRefresh) {
-      console.log('📱 Device fetch already in progress, waiting...');
       return state.fetchPromise;
     }
     
     // Check minimum interval between fetches (prevent rapid successive calls)
     if (!forceRefresh && (now - state.lastFetchTime) < MIN_FETCH_INTERVAL) {
-      console.log('📱 Too soon to fetch devices again, skipping...');
       return Promise.resolve();
     }
 
     const userId = useAuthStore.getState().user?.id;
     if (!userId) {
-      console.log('📱 No user ID, skipping device fetch');
       return Promise.resolve();
     }
 
@@ -139,11 +97,9 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
         try {
           const { devices, timestamp } = JSON.parse(cached);
           if (now - timestamp < CACHE_TTL) {
-            console.log('📱 Using cached devices (10min cache)');
             set({ devices, lastFetchTime: now });
             return Promise.resolve();
           } else {
-            console.log('📱 Cache expired, fetching fresh data');
           }
         } catch (e) {
           console.warn('Failed to parse device cache:', e);
@@ -152,7 +108,6 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
       }
     }
 
-    console.log('📱 Fetching devices from server...');
     set({ error: null, isLoading: true });
 
     const fetchPromise = (async () => {
@@ -174,7 +129,6 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
         const data = await response.json();
         const devices = data.devices || [];
         
-        console.log('📱 Devices fetched successfully:', devices.length);
         
         set({ 
           devices, 
@@ -320,31 +274,4 @@ export const useDevicesStore = create<DevicesState>((set, get) => ({
     const minutesSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
     get().updateDevice(deviceId, { isOnline: minutesSinceUpdate < 15 });
   },
-
-  fetchDistanceCovered: async (deviceId: string, hours?: number): Promise<DistanceCoveredResponse> => {
-    const res = await fetchWithAutoRefresh(
-      `${process.env.NEXT_PUBLIC_API_URL}/locations/distance/${deviceId}?hours=${hours || 24}`,
-      { credentials: "include" }
-    );
-    if (!res.ok) throw new Error("Failed to fetch distance");
-    return await res.json();
-  },
-
-  fetchLocationTrail: async (deviceId: string, hours?: number): Promise<LocationTrailResponse> => {
-    const res = await fetchWithAutoRefresh(
-      `${process.env.NEXT_PUBLIC_API_URL}/locations/trail/${deviceId}?hours=${hours || 24}`,
-      { credentials: "include" }
-    );
-    if (!res.ok) throw new Error("Failed to fetch trail");
-    return await res.json();
-  },
-
-  fetchLocationStats: async (deviceId: string, days?: number): Promise<LocationStatsResponse> => {
-    const res = await fetchWithAutoRefresh(
-      `${process.env.NEXT_PUBLIC_API_URL}/locations/stats/${deviceId}?days=${days || 7}`,
-      { credentials: "include" }
-    );
-    if (!res.ok) throw new Error("Failed to fetch stats");
-    return await res.json();
-  }
 }));

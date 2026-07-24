@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,140 +10,59 @@ import { useDevicesStore } from "@/store/devices";
 import { DashboardModal } from "./dashboard-modal";
 import { useDeviceSocket } from "@/hooks/use-device-sockets";
 
-interface Position {
-  left: string;
-  top: string;
-  duration: number;
-  delay: number;
-}
-
-interface LocationHistoryEntry {
-  _id: string;
-  location: { coordinates: [number, number] };
-  locationName: string;
-  timestamp: string;
-  accuracy?: string;
-  battery?: number;
-  activity?: string;
-}
-
 export function DashboardOverview() {
-  const [positions, setPositions] = useState<Position[]>([]);
-  const [isClient, setIsClient] = useState(false);
-  const [todayLocations, setTodayLocations] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<'register' | 'history'>('register');
+  const [modalType, setModalType] = useState<"register" | "history">("register");
+  const [activeToday, setActiveToday] = useState(0);
 
-  // Get state and actions from devices store
-  const { 
-    devices, 
-    isLoading, 
-    error, 
-    fetchDevices, 
-    fetchLocationHistory,
-    updateOnlineStatusFromHistory 
-  } = useDevicesStore();
+  const { devices, isLoading, error, fetchDevices, updateOnlineStatusFromHistory } =
+    useDevicesStore();
 
-  // Extract device IDs for socket connection
-  const deviceIds = devices.map(device => device.deviceId);
-  
-  // Listen for live updates only — do not emit browser GPS as device location
-  useDeviceSocket(deviceIds, { enableTracking: false });
+  const deviceIds = devices.map((device) => device.deviceId);
+  useDeviceSocket(deviceIds);
 
-  useEffect(() => {
-    setIsClient(true);
-    const newPositions = Array.from({ length: 6 }, () => ({
-      left: `${Math.random() * 100}%`,
-      top: `${Math.random() * 100}%`,
-      duration: 4 + Math.random() * 2,
-      delay: Math.random() * 2,
-    }));
-    setPositions(newPositions);
-  }, []);
+  const syncPresenceFromDevices = () => {
+    const today = new Date().toDateString();
+    let count = 0;
 
-  // Load devices once, then history from store snapshot (avoids devices-deps refetch loop)
-  useEffect(() => {
-    const loadDevicesAndLocationData = async () => {
-      await fetchDevices();
-
-      const currentDevices = useDevicesStore.getState().devices;
-      if (currentDevices.length === 0) {
-        setTodayLocations(0);
-        return;
-      }
-
-      let totalTodayLocations = 0;
-
-      for (const device of currentDevices) {
-        try {
-          const historyData = await fetchLocationHistory(device.deviceId);
-          const history: LocationHistoryEntry[] = historyData.history || [];
-
-          const today = new Date().toDateString();
-          const todayCount = history.filter(
-            (entry) => new Date(entry.timestamp).toDateString() === today
-          ).length;
-          totalTodayLocations += todayCount;
-
-          if (history.length > 0) {
-            updateOnlineStatusFromHistory(device.deviceId, history[0].timestamp);
-          }
-        } catch (err) {
-          console.error(
-            `Failed to fetch location history for device ${device.deviceId}:`,
-            err
-          );
+    for (const device of useDevicesStore.getState().devices) {
+      if (device.updatedAt) {
+        updateOnlineStatusFromHistory(device.deviceId, device.updatedAt);
+        if (new Date(device.updatedAt).toDateString() === today) {
+          count += 1;
         }
       }
-
-      setTodayLocations(totalTodayLocations);
-    };
-
-    void loadDevicesAndLocationData();
-  }, [fetchDevices, fetchLocationHistory, updateOnlineStatusFromHistory]);
-
-  // Refresh handler using store method
-  const handleRefresh = async () => {
-    await fetchDevices(true); // Force refresh
-    
-    // Recalculate today's locations after refresh
-    let totalTodayLocations = 0;
-    for (const device of devices) {
-      try {
-        const historyData = await fetchLocationHistory(device.deviceId);
-        const history: LocationHistoryEntry[] = historyData.history || [];
-        
-        const today = new Date().toDateString();
-        const todayCount = history.filter(entry => 
-          new Date(entry.timestamp).toDateString() === today
-        ).length;
-        totalTodayLocations += todayCount;
-      } catch (err) {
-        console.error(`Failed to fetch location history for device ${device.deviceId}:`, err);
-      }
     }
-    setTodayLocations(totalTodayLocations);
+
+    return count;
   };
 
-  // Modal handlers
+  useEffect(() => {
+    const load = async () => {
+      await fetchDevices();
+      setActiveToday(syncPresenceFromDevices());
+    };
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchDevices]);
+
+  const handleRefresh = async () => {
+    await fetchDevices(true);
+    setActiveToday(syncPresenceFromDevices());
+  };
+
   const openRegisterModal = () => {
-    setModalType('register');
+    setModalType("register");
     setModalOpen(true);
   };
 
   const openHistoryModal = () => {
-    setModalType('history');
+    setModalType("history");
     setModalOpen(true);
   };
 
-  const handleDeviceRegistered = () => {
-    // Refresh devices after registration
-    handleRefresh();
-  };
+  const onlineDevices = devices.filter((device) => device.isOnline).length;
 
-  // Calculate stats from store data
-  const onlineDevices = devices.filter(device => device.isOnline).length;
-  
   const stats = [
     {
       title: "Total Devices",
@@ -161,10 +81,10 @@ export function DashboardOverview() {
       bgColor: "bg-green-500/20",
     },
     {
-      title: "Locations Today",
-      value: todayLocations.toString(),
+      title: "Active Today",
+      value: activeToday.toString(),
       icon: MapPin,
-      change: "Data points collected",
+      change: "Devices with updates today",
       color: "text-purple-400",
       bgColor: "bg-purple-500/20",
     },
@@ -174,7 +94,7 @@ export function DashboardOverview() {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center px-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-2 border-blue-400 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-2 border-blue-400 mx-auto mb-4" />
           <p className="text-lg sm:text-xl">Loading dashboard...</p>
         </div>
       </div>
@@ -185,10 +105,12 @@ export function DashboardOverview() {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center px-4">
         <div className="text-center max-w-md">
-          <div className="text-red-400 text-4xl sm:text-6xl mb-4">⚠️</div>
           <h2 className="text-xl sm:text-2xl font-bold text-red-400 mb-2">Dashboard Error</h2>
           <p className="text-gray-300 mb-4 text-sm sm:text-base">{error}</p>
-          <Button onClick={handleRefresh} className="bg-blue-500 hover:bg-blue-600 text-white w-full sm:w-auto">
+          <Button
+            onClick={() => void handleRefresh()}
+            className="bg-blue-500 hover:bg-blue-600 text-white w-full sm:w-auto"
+          >
             Try Again
           </Button>
         </div>
@@ -198,66 +120,42 @@ export function DashboardOverview() {
 
   return (
     <div className="min-h-screen bg-black text-white relative">
-      {/* Gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-900/10 via-purple-900/10 to-black" />
 
-      {/* Floating particles */}
-      {isClient && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {positions.map((pos, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1 h-1 bg-blue-400/20 rounded-full"
-              style={{
-                left: pos.left,
-                top: pos.top,
-              }}
-              animate={{
-                y: [0, -20, 0],
-                opacity: [0.2, 0.8, 0.2],
-              }}
-              transition={{
-                duration: pos.duration,
-                repeat: Number.POSITIVE_INFINITY,
-                delay: pos.delay,
-              }}
-            />
-          ))}
-        </div>
-      )}
-
       <div className="relative z-10 space-y-4 sm:space-y-6 lg:space-y-8 p-4 sm:p-6 lg:p-8">
-        {/* Header Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
         >
-          <div className="text-center sm:text-left ">
+          <div className="text-center sm:text-left">
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-blue-200 to-blue-400 bg-clip-text text-transparent mb-2 sm:mb-3">
               Dashboard Overview
             </h1>
-            <p className="text-gray-400 text-sm sm:text-base lg:text-lg">Monitor your devices and tracking activity</p>
+            <p className="text-gray-400 text-sm sm:text-base lg:text-lg">
+              Monitor your devices and tracking activity
+            </p>
           </div>
           <div className="flex items-center justify-center sm:justify-end gap-2 sm:gap-4">
             <Button
-              onClick={handleRefresh}
+              onClick={() => void handleRefresh()}
               disabled={isLoading}
               variant="outline"
               size="sm"
               className="border-blue-500/30 text-blue-300 hover:bg-blue-500 hover:text-white text-xs sm:text-sm"
             >
-              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              {isLoading ? 'Refreshing...' : 'Refresh'}
+              <RefreshCw
+                className={`w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 ${isLoading ? "animate-spin" : ""}`}
+              />
+              {isLoading ? "Refreshing..." : "Refresh"}
             </Button>
           </div>
         </motion.div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {stats.map((stat, index) => (
             <motion.div
-              key={index}
+              key={stat.title}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
@@ -268,7 +166,9 @@ export function DashboardOverview() {
                   <CardTitle className="text-xs sm:text-sm font-medium text-gray-300 group-hover:text-white transition-colors">
                     {stat.title}
                   </CardTitle>
-                  <div className={`p-1.5 sm:p-2 rounded-lg ${stat.bgColor} group-hover:scale-110 transition-transform`}>
+                  <div
+                    className={`p-1.5 sm:p-2 rounded-lg ${stat.bgColor} group-hover:scale-110 transition-transform`}
+                  >
                     <stat.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${stat.color}`} />
                   </div>
                 </CardHeader>
@@ -281,9 +181,7 @@ export function DashboardOverview() {
           ))}
         </div>
 
-        {/* Devices Section */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-          {/* Device Status */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -307,7 +205,9 @@ export function DashboardOverview() {
                   <div className="text-center py-8 sm:py-12">
                     <Smartphone className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-400 text-lg sm:text-xl mb-2">No devices registered</p>
-                    <p className="text-gray-500 text-sm sm:text-base">Add your first device to start tracking</p>
+                    <p className="text-gray-500 text-sm sm:text-base">
+                      Add your first device to start tracking
+                    </p>
                   </div>
                 ) : (
                   devices.map((device, index) => (
@@ -324,19 +224,23 @@ export function DashboardOverview() {
                           <Smartphone className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-white font-semibold text-sm sm:text-base truncate">{device.name}</p>
+                          <p className="text-white font-semibold text-sm sm:text-base truncate">
+                            {device.name}
+                          </p>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-400 mt-1">
                             <span className="flex items-center">
                               <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
                               <span className="truncate">
-                                {device.updatedAt ? new Date(device.updatedAt).toLocaleString() : 'Never'}
+                                {device.updatedAt
+                                  ? new Date(device.updatedAt).toLocaleString()
+                                  : "Never"}
                               </span>
                             </span>
                             <span className="flex items-center">
                               <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
                               <span className="truncate">
-                                {device.location?.coordinates 
-                                  ? `${device.location.coordinates[1].toFixed(4)}, ${device.location.coordinates[0].toFixed(4)}` 
+                                {device.location?.coordinates
+                                  ? `${device.location.coordinates[1].toFixed(4)}, ${device.location.coordinates[0].toFixed(4)}`
                                   : "No location"}
                               </span>
                             </span>
@@ -366,7 +270,6 @@ export function DashboardOverview() {
             </Card>
           </motion.div>
 
-          {/* Quick Actions */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -379,7 +282,7 @@ export function DashboardOverview() {
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4">
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button 
+                  <Button
                     onClick={openRegisterModal}
                     className="w-full p-3 sm:p-4 h-auto bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white transition-all duration-300 group cursor-pointer"
                   >
@@ -396,7 +299,6 @@ export function DashboardOverview() {
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
                     onClick={openHistoryModal}
-                    // variant="outline"
                     className="w-full p-3 sm:p-4 h-auto text-white hover:bg-blue-500/20 hover:border-blue-400/40 hover:text-blue-100 transition-all duration-300 group cursor-pointer"
                   >
                     <div className="flex items-center justify-between w-full">
@@ -414,12 +316,11 @@ export function DashboardOverview() {
         </div>
       </div>
 
-      {/* Dashboard Modal */}
       <DashboardModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         type={modalType}
-        onDeviceRegistered={handleDeviceRegistered}
+        onDeviceRegistered={() => void handleRefresh()}
       />
     </div>
   );

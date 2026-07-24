@@ -133,7 +133,6 @@ export const useAuthStore = create<AuthState>()(
             needsVerification: false,
             verificationSuccess: false 
           })
-          console.log(res);
 
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : 'Login failed'

@@ -27,7 +27,6 @@ function LoginForm() {
     clearError, 
     needsVerification, 
     verificationEmail,
-    user,
     isAuthenticated,
   } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
@@ -45,8 +44,6 @@ function LoginForm() {
     // Only redirect on a confirmed session — NOT persisted `user` alone
     if (isAuthenticated && !isRedirecting && !isLoggingIn) {
       setIsRedirecting(true);
-      // Soft navigate — keep Zustand session; hard reload re-ran /me and
-      // bounced phones back to login when cookies weren't readable yet.
       router.replace(safeNext);
     }
   }, [isAuthenticated, router, isRedirecting, safeNext, isLoggingIn]);

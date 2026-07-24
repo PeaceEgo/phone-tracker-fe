@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, TrendingUp, Calendar, Smartphone, RefreshCw, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import { fetchWithAutoRefresh } from "@/lib/api";
-import { useDeviceSocket } from "@/hooks/use-device-sockets";
 
 interface Location {
   id: string;
@@ -52,13 +51,6 @@ export default function LocationHistory() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
-
-  const { } = useDeviceSocket(
-    device ? [device.deviceId] : [],
-    {
-      enableTracking: false,
-    }
-  );
 
   const paginationData = useMemo(() => {
     const totalItems = locationData.length;

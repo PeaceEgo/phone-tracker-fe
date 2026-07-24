@@ -81,10 +81,6 @@ export const useDeviceRegistration = () => {
             accuracy: position.coords.accuracy
           };
           
-          console.log('Geolocation success:', {
-            ...result,
-            timestamp: new Date(position.timestamp)
-          });
           
           setCurrentLocation(result);
           setIsGettingLocation(false);
@@ -156,8 +152,6 @@ export const useDeviceRegistration = () => {
         ...(locationName && { locationName })
       };
 
-      console.log('Registering device with fingerprint:', deviceFingerprint);
-      console.log('Device data:', deviceData);
 
       const response = await fetchWithAutoRefresh(
         `${process.env.NEXT_PUBLIC_API_URL}/devices/register`,
